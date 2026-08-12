@@ -90,6 +90,8 @@ def get_worksheet(key):
             if missing:
                 start_col = len(existing) + 1
                 end_col = start_col + len(missing) - 1
+                if ws.col_count < end_col:
+                    ws.add_cols(end_col - ws.col_count)
                 cell_range = "{}:{}".format(
                     gspread.utils.rowcol_to_a1(1, start_col),
                     gspread.utils.rowcol_to_a1(1, end_col),
