@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Scan Document // Archives{% endblock %}
+{% block content %}
+  <h1 class="page-title">Scan Document</h1>
+  <p class="page-subtitle">Upload a photo or PDF of a document - it's stored in Drive and filed as a new Archives entry.</p>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <section class="add-form">
+    <form method="post" enctype="multipart/form-data">
+      <div class="form-grid">
+        <label>
+          Document (image or PDF)
+          <input type="file" name="document" accept="image/*,application/pdf">
+        </label>
+        {% for h in fields %}
+          <label>
+            {{ h }}
+            {% if h == 'Description' or h == 'Containment Procedures' %}
+              <textarea name="{{ h }}" rows="3">{{ form.get(h, '') }}</textarea>
+            {% else %}
+              <input type="text" name="{{ h }}" value="{{ form.get(h, '') }}">
+            {% endif %}
+          </label>
+        {% endfor %}
+      </div>
+      <button type="submit">Save to Archives</button>
+    </form>
+  </section>
+{% endblock %}

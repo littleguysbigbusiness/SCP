@@ -3,6 +3,12 @@
 {% block content %}
   <h1 class="page-title">{{ title }}</h1>
 
+  {% if key == 'staff' %}
+    <p class="page-subtitle"><a href="{{ url_for('staff_lookup') }}">Look up a staff member by ID or barcode scan &raquo;</a></p>
+  {% elif key == 'archives' %}
+    <p class="page-subtitle"><a href="{{ url_for('archives_scan') }}">Scan a document into the Archives &raquo;</a></p>
+  {% endif %}
+
   {% if error %}
     <div class="alert">
       Unable to reach the database: {{ error }}
@@ -19,7 +25,15 @@
       <tbody>
         {% for row in rows %}
           <tr>
-            {% for h in headers %}<td>{{ row[h] }}</td>{% endfor %}
+            {% for h in headers %}
+              <td>
+                {% if h == 'Scan URL' and row[h] %}
+                  <a href="{{ row[h] }}" target="_blank" rel="noopener">View scan</a>
+                {% else %}
+                  {{ row[h] }}
+                {% endif %}
+              </td>
+            {% endfor %}
           </tr>
         {% else %}
           <tr><td colspan="{{ headers|length }}" class="empty-row">No records on file.</td></tr>

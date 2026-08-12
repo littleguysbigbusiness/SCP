@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Staff Lookup // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Staff Lookup</h1>
+  <p class="page-subtitle">Type a Staff ID or scan a keycard/badge barcode - it types the ID and hits Enter for you.</p>
+
+  <form method="get" class="add-form">
+    <div class="form-grid">
+      <label>
+        Staff ID
+        <input type="text" name="id" value="{{ query }}" autofocus autocomplete="off">
+      </label>
+    </div>
+    <button type="submit">Look Up</button>
+  </form>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% elif query and not match %}
+    <div class="alert">No staff member found with ID "{{ query }}".</div>
+  {% elif match %}
+    <section class="table-wrap">
+      <table>
+        <tbody>
+          {% for field in ['ID', 'Name', 'Role', 'Clearance Level', 'Role Rank', 'Site', 'Status', 'Age', 'Born', 'Contact'] %}
+            <tr>
+              <th>{{ field }}</th>
+              <td>{{ match[field] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+
+  <script>
+    document.querySelector('input[name="id"]').select();
+  </script>
+{% endblock %}

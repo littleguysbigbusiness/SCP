@@ -6,3 +6,4 @@ reportlab==5.0.0
 Pillow==12.3.0
 svglib==2.1.0
 lxml==6.1.1
+google-api-python-client==2.149.0

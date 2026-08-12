@@ -5,7 +5,10 @@ import time
 import gspread
 from google.oauth2.service_account import Credentials
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
 
 # Google's default Sheets API quota is 60 read requests/min per user. Without
 # caching, a single dashboard load (3 tiles) can burn 10+ reads, so worksheet
@@ -15,7 +18,15 @@ ROWS_CACHE_TTL = 20
 TABS = {
     "archives": {
         "title": "Archives",
-        "headers": ["ID", "Designation", "Object Class", "Description", "Containment Procedures", "Date Added"],
+        "headers": [
+            "ID",
+            "Designation",
+            "Object Class",
+            "Description",
+            "Containment Procedures",
+            "Date Added",
+            "Scan URL",
+        ],
     },
     "staff": {
         "title": "Staff",
@@ -39,22 +50,30 @@ TABS = {
     },
 }
 
+_credentials = None
 _client = None
 _spreadsheet = None
 _worksheets = {}
 _rows_cache = {}  # key -> (fetched_at, rows)
 
 
-def get_client():
-    global _client
-    if _client is not None:
-        return _client
+def get_credentials():
+    global _credentials
+    if _credentials is not None:
+        return _credentials
     creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not creds_json:
         raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON env var is not set")
     info = json.loads(creds_json)
-    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-    _client = gspread.authorize(creds)
+    _credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
+    return _credentials
+
+
+def get_client():
+    global _client
+    if _client is not None:
+        return _client
+    _client = gspread.authorize(get_credentials())
     return _client
 
 

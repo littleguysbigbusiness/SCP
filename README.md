@@ -29,12 +29,30 @@ the link can edit" sharing setting doesn't give an API/server credential).
 7. Copy the full contents of the downloaded JSON file — you'll paste it as the
    `GOOGLE_SERVICE_ACCOUNT_JSON` environment variable (see below).
 
+### Also required for Archives → Scan Document
+
+Uploaded scans need somewhere to live. Service accounts have **no Drive storage quota of
+their own** — uploads have to land in a folder a real Google account owns, shared with the
+service account:
+
+1. In Google Drive, create a folder (e.g. "SCP Archive Scans").
+2. Share it with the same service account email from step 5 above, with **Editor** access.
+3. Open the folder and copy its ID from the URL:
+   `drive.google.com/drive/folders/<THIS_PART>`.
+4. Enable the **Google Drive API** in the same Cloud project (APIs & Services → Enable APIs
+   → search "Google Drive API").
+5. Set that ID as the `GOOGLE_DRIVE_FOLDER_ID` environment variable (see below).
+
+If this isn't set up, `/archives/scan` still works for everything except the file upload —
+it shows an error and leaves the Archives entry unsaved rather than saving a broken link.
+
 ## Environment variables
 
 | Variable | Description |
 |---|---|
 | `GOOGLE_SHEET_ID` | The ID from the sheet URL: `docs.google.com/spreadsheets/d/<THIS_PART>/edit` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | The full JSON key file contents, as a single-line string |
+| `GOOGLE_DRIVE_FOLDER_ID` | ID of a Drive folder shared with the service account (Editor), for Archives → Scan Document uploads |
 | `SECRET_KEY` | Any random string, used for Flask session signing |
 
 See `.env.example` for the format.
@@ -63,9 +81,9 @@ This repo includes a `render.yaml` blueprint.
 
 1. Push this repo to GitHub (already done if you're reading this from the repo).
 2. In Render, choose **New → Blueprint**, point it at this repo.
-3. Render will create a web service from `render.yaml`. It will prompt you for the two
-   secret env vars (`GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`) since they're marked
-   `sync: false` — paste in the values from the setup steps above.
+3. Render will create a web service from `render.yaml`. It will prompt you for the secret
+   env vars (`GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_DRIVE_FOLDER_ID`)
+   since they're marked `sync: false` — paste in the values from the setup steps above.
 4. Deploy. The start command is `gunicorn app:app`.
 
 ## Print Center
@@ -103,14 +121,36 @@ a ReportLab Drawing, then deep-copied and recolored per use (e.g. white on a dar
 header, black elsewhere) instead of rasterizing to a fixed-color PNG. Used on Staff IDs,
 Keycards, and the SCP Logo Sticker.
 
+## Staff Lookup
+
+`/staff/lookup` (linked from the Staff page) is a single ID input, auto-focused, that
+submits on Enter — which is exactly how a USB/Bluetooth barcode scanner behaves (it types
+the scanned text, then sends Enter as if from a keyboard). Scanning a keycard's barcode or
+typing a Staff ID both look up and display that person's full record. No match just shows
+"not found" rather than erroring.
+
+## Archives → Scan Document
+
+`/archives/scan` (linked from the Archives page) uploads a photo or PDF of a document
+straight into a new Archives row. The file goes to Google Drive via `drive_client.py`
+(using the same service account as the Sheet, plus the Drive scope/folder from the setup
+section above) and the resulting link is stored in a `Scan URL` column, shown as a "View
+scan" link in the Archives table. `Date Added` auto-fills with today's date if left blank.
+Uploads are capped at 10MB (`MAX_CONTENT_LENGTH`). If the Drive upload fails (e.g. the
+folder isn't shared yet), the form re-shows with an error and nothing is saved — no entry
+with a dead link.
+
 ## Project structure
 
 ```
 app.py              Flask routes
 sheets_client.py     Google Sheets read/write helpers
+drive_client.py       Google Drive upload helper (Archives scans)
 cards.py             PDF generation (keycards, staff IDs, stickers)
-templates/           Jinja templates (dashboard, per-tile list/add views, print center)
+templates/           Jinja templates (dashboard, per-tile list/add views, print center,
+                      staff lookup, archives scan)
 static/style.css      Styling
+static/assets/         Bundled static assets (Foundation emblem SVG)
 render.yaml           Render Blueprint (service + env var slots)
 requirements.txt
 ```

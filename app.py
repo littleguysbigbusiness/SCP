@@ -4,10 +4,12 @@ from datetime import datetime, timezone
 from flask import Flask, redirect, render_template, request, send_file, url_for
 
 import cards
+import drive_client
 import sheets_client as sc
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 TILES = [
     {"key": "archives", "title": "Archives", "description": "SCP object records and containment data."},
@@ -75,9 +77,52 @@ def archives():
     return _list_view("archives", "Archives")
 
 
+@app.route("/archives/scan", methods=["GET", "POST"])
+def archives_scan():
+    fields = [h for h in sc.TABS["archives"]["headers"] if h != "Scan URL"]
+
+    if request.method == "POST":
+        error = None
+        scan_url = ""
+        file = request.files.get("document")
+        if file and file.filename:
+            try:
+                scan_url = drive_client.upload_scan(file)
+            except Exception as exc:
+                error = "Could not upload scan: {}".format(exc)
+
+        if error:
+            return render_template("archives_scan.html", fields=fields, error=error, form=request.form)
+
+        row = {h: request.form.get(h, "").strip() for h in fields}
+        if not row.get("Date Added"):
+            row["Date Added"] = datetime.now(timezone.utc).date().isoformat()
+        row["Scan URL"] = scan_url
+        sc.add_row("archives", row)
+        return redirect(url_for("archives"))
+
+    return render_template("archives_scan.html", fields=fields, error=None, form={})
+
+
 @app.route("/staff", methods=["GET", "POST"])
 def staff():
     return _list_view("staff", "Staff")
+
+
+@app.route("/staff/lookup")
+def staff_lookup():
+    query = request.args.get("id", "").strip()
+    match = None
+    error = None
+    if query:
+        try:
+            for row in sc.get_rows("staff"):
+                if str(row.get("ID", "")).strip().lower() == query.lower():
+                    match = row
+                    break
+        except Exception as exc:
+            error = str(exc)
+    return render_template("staff_lookup.html", query=query, match=match, error=error)
 
 
 @app.route("/communications", methods=["GET", "POST"])
