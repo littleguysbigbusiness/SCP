@@ -31,8 +31,8 @@ PRINT_TILES = [
     {
         "key": "stickers",
         "title": "Stickers",
-        "description": "Awaiting sticker template.",
-        "ready": False,
+        "description": "Print envelope tags and Foundation logo stickers.",
+        "ready": True,
     },
 ]
 
@@ -155,9 +155,48 @@ def print_staff_ids_pdf():
     )
 
 
+STICKER_QTY_DEFAULT = 18
+STICKER_QTY_MAX = 200
+
+
+def _sticker_qty():
+    raw = request.form.get("quantity", "")
+    try:
+        qty = int(raw)
+    except ValueError:
+        qty = STICKER_QTY_DEFAULT
+    return max(1, min(qty, STICKER_QTY_MAX))
+
+
 @app.route("/print/stickers")
 def print_stickers():
-    return render_template("print_placeholder.html", title="Stickers")
+    return render_template(
+        "print_stickers.html",
+        default_qty=STICKER_QTY_DEFAULT,
+        max_qty=STICKER_QTY_MAX,
+    )
+
+
+@app.route("/print/stickers/envelope-tags/pdf", methods=["POST"])
+def print_envelope_tags_pdf():
+    pdf_buf = cards.build_envelope_tags_pdf(_sticker_qty())
+    return send_file(
+        pdf_buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="scp_envelope_tags.pdf",
+    )
+
+
+@app.route("/print/stickers/logo/pdf", methods=["POST"])
+def print_logo_stickers_pdf():
+    pdf_buf = cards.build_logo_stickers_pdf(_sticker_qty())
+    return send_file(
+        pdf_buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="scp_logo_stickers.pdf",
+    )
 
 
 if __name__ == "__main__":

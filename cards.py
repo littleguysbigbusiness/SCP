@@ -29,8 +29,14 @@ CARD_WIDTH = 3.375 * inch
 CARD_HEIGHT = 2.125 * inch
 MARGIN = 0.5 * inch
 GAP = 0.25 * inch
-COLS = 2
-ROWS = 4
+
+TAG_WIDTH = 2.2 * inch
+TAG_HEIGHT = 1.4 * inch
+LOGO_SIZE = 1.4 * inch
+STICKER_MARGIN = 0.5 * inch
+STICKER_GAP = 0.2 * inch
+
+ACCENT = colors.HexColor("#c9a13b")
 
 CLEARANCE_COLORS = {
     "0": colors.HexColor("#5b6167"),
@@ -105,6 +111,43 @@ def _make_barcode(value, target_width, height):
     return bc
 
 
+def _draw_seal(c, cx, cy, r, color):
+    c.setStrokeColor(color)
+    c.setLineWidth(1)
+    c.circle(cx, cy, r, fill=0, stroke=1)
+    c.circle(cx, cy, r * 0.55, fill=0, stroke=1)
+    c.setFillColor(color)
+    c.circle(cx, cy, r * 0.15, fill=1, stroke=0)
+
+
+def _tile_grid(item_w, item_h, page_w, page_h, margin, gap):
+    cols = int((page_w - 2 * margin + gap) // (item_w + gap))
+    rows = int((page_h - 2 * margin + gap) // (item_h + gap))
+    return max(cols, 1), max(rows, 1)
+
+
+def _build_grid_pdf(items, item_w, item_h, draw_fn, margin=MARGIN, gap=GAP):
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    page_w, page_h = letter
+    cols, rows = _tile_grid(item_w, item_h, page_w, page_h, margin, gap)
+    per_page = cols * rows
+
+    for i, item in enumerate(items):
+        pos = i % per_page
+        if i > 0 and pos == 0:
+            c.showPage()
+        col = pos % cols
+        row = pos // cols
+        x = margin + col * (item_w + gap)
+        y = page_h - margin - item_h - row * (item_h + gap)
+        draw_fn(c, x, y, item)
+
+    c.save()
+    buf.seek(0)
+    return buf
+
+
 def _draw_card(c, x, y, staff):
     accent = _clearance_color(staff.get("Clearance Level", ""))
 
@@ -144,15 +187,6 @@ def _draw_card(c, x, y, staff):
     c.setStrokeColor(accent)
     c.setLineWidth(1)
     c.roundRect(x, y, CARD_WIDTH, CARD_HEIGHT, 6, fill=0, stroke=1)
-
-
-def _draw_seal(c, cx, cy, r, color):
-    c.setStrokeColor(color)
-    c.setLineWidth(1)
-    c.circle(cx, cy, r, fill=0, stroke=1)
-    c.circle(cx, cy, r * 0.55, fill=0, stroke=1)
-    c.setFillColor(color)
-    c.circle(cx, cy, r * 0.15, fill=1, stroke=0)
 
 
 def _draw_id_card(c, x, y, staff):
@@ -227,43 +261,87 @@ def _draw_id_card(c, x, y, staff):
     c.roundRect(x, y, CARD_WIDTH, CARD_HEIGHT, 6, fill=0, stroke=1)
 
 
+def _draw_envelope_tag(c, x, y):
+    header_h = 0.22 * inch
+    pad = 0.1 * inch
+
+    c.setFillColor(colors.white)
+    c.rect(x, y, TAG_WIDTH, TAG_HEIGHT, fill=1, stroke=0)
+
+    c.setFillColor(ACCENT)
+    c.rect(x, y + TAG_HEIGHT - header_h, TAG_WIDTH, header_h, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawCentredString(x + TAG_WIDTH / 2, y + TAG_HEIGHT - header_h + 0.06 * inch, "SCP FOUNDATION")
+
+    fields = ["To", "From", "Address", "Notes"]
+    content_h = TAG_HEIGHT - header_h - pad
+    line_h = content_h / len(fields)
+    content_top = y + TAG_HEIGHT - header_h - 0.03 * inch
+
+    for i, label in enumerate(fields):
+        row_y = content_top - i * line_h - line_h * 0.68
+        label_text = "{}:".format(label)
+        c.setFont("Helvetica-Bold", 6)
+        c.setFillColor(colors.HexColor("#33383f"))
+        c.drawString(x + pad, row_y, label_text)
+
+        label_w = c.stringWidth(label_text, "Helvetica-Bold", 6)
+        c.setStrokeColor(colors.HexColor("#a9adb2"))
+        c.setLineWidth(0.5)
+        c.line(x + pad + label_w + 0.05 * inch, row_y - 0.02 * inch, x + TAG_WIDTH - pad, row_y - 0.02 * inch)
+
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(1)
+    c.rect(x, y, TAG_WIDTH, TAG_HEIGHT, fill=0, stroke=1)
+
+
+def _draw_logo_sticker(c, x, y):
+    r = LOGO_SIZE / 2
+    cx, cy = x + r, y + r
+
+    c.setFillColor(colors.white)
+    c.circle(cx, cy, r, fill=1, stroke=0)
+
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(1.5)
+    c.circle(cx, cy, r - 0.03 * inch, fill=0, stroke=1)
+    c.setLineWidth(0.75)
+    c.circle(cx, cy, r * 0.62, fill=0, stroke=1)
+
+    c.setFillColor(colors.HexColor("#14161a"))
+    c.setFont("Helvetica-Bold", 13)
+    c.drawCentredString(cx, cy + 0.02 * inch, "SCP")
+    c.setFont("Helvetica", 5.5)
+    c.setFillColor(ACCENT)
+    c.drawCentredString(cx, cy - 0.17 * inch, "FOUNDATION")
+
+
 def build_staff_id_pdf(staff_list):
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=letter)
-    _, page_h = letter
-
-    per_page = COLS * ROWS
-    for i, staff in enumerate(staff_list):
-        pos = i % per_page
-        if i > 0 and pos == 0:
-            c.showPage()
-        col = pos % COLS
-        row = pos // COLS
-        x = MARGIN + col * (CARD_WIDTH + GAP)
-        y = page_h - MARGIN - CARD_HEIGHT - row * (CARD_HEIGHT + GAP)
-        _draw_id_card(c, x, y, staff)
-
-    c.save()
-    buf.seek(0)
-    return buf
+    return _build_grid_pdf(staff_list, CARD_WIDTH, CARD_HEIGHT, lambda c, x, y, s: _draw_id_card(c, x, y, s))
 
 
 def build_keycards_pdf(staff_list):
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=letter)
-    _, page_h = letter
+    return _build_grid_pdf(staff_list, CARD_WIDTH, CARD_HEIGHT, lambda c, x, y, s: _draw_card(c, x, y, s))
 
-    per_page = COLS * ROWS
-    for i, staff in enumerate(staff_list):
-        pos = i % per_page
-        if i > 0 and pos == 0:
-            c.showPage()
-        col = pos % COLS
-        row = pos // COLS
-        x = MARGIN + col * (CARD_WIDTH + GAP)
-        y = page_h - MARGIN - CARD_HEIGHT - row * (CARD_HEIGHT + GAP)
-        _draw_card(c, x, y, staff)
 
-    c.save()
-    buf.seek(0)
-    return buf
+def build_envelope_tags_pdf(count):
+    return _build_grid_pdf(
+        range(count),
+        TAG_WIDTH,
+        TAG_HEIGHT,
+        lambda c, x, y, _: _draw_envelope_tag(c, x, y),
+        margin=STICKER_MARGIN,
+        gap=STICKER_GAP,
+    )
+
+
+def build_logo_stickers_pdf(count):
+    return _build_grid_pdf(
+        range(count),
+        LOGO_SIZE,
+        LOGO_SIZE,
+        lambda c, x, y, _: _draw_logo_sticker(c, x, y),
+        margin=STICKER_MARGIN,
+        gap=STICKER_GAP,
+    )

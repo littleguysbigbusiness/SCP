@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Stickers // Print Center{% endblock %}
+{% block content %}
+  <h1 class="page-title">Stickers</h1>
+  <p class="page-subtitle">Small enough for an envelope flap. Pick a quantity and download a printable sheet.</p>
+
+  <div class="tile-grid">
+    <section class="add-form">
+      <h2>Envelope Tag</h2>
+      <p class="page-subtitle">To / From / Address / Notes — fill in by hand after printing, then use it to seal the envelope.</p>
+      <form method="post" action="{{ url_for('print_envelope_tags_pdf') }}">
+        <div class="form-grid">
+          <label>
+            Quantity
+            <input type="number" name="quantity" value="{{ default_qty }}" min="1" max="{{ max_qty }}">
+          </label>
+        </div>
+        <button type="submit">Download PDF</button>
+      </form>
+    </section>
+
+    <section class="add-form">
+      <h2>SCP Logo Sticker</h2>
+      <p class="page-subtitle">Plain Foundation seal, for sealing an envelope or general use.</p>
+      <form method="post" action="{{ url_for('print_logo_stickers_pdf') }}">
+        <div class="form-grid">
+          <label>
+            Quantity
+            <input type="number" name="quantity" value="{{ default_qty }}" min="1" max="{{ max_qty }}">
+          </label>
+        </div>
+        <button type="submit">Download PDF</button>
+      </form>
+    </section>
+  </div>
+{% endblock %}

@@ -82,18 +82,23 @@ Letter page in both cases.
   a Code128 barcode of the Staff ID, and an "Area" that's assigned deterministically at
   print time (seeded by Staff ID, so it's stable across reprints) since there's no Area
   column in the sheet — swap in a real column if you'd rather it be authored data.
-- **Stickers** — placeholder page until a template is provided.
+- **Stickers** (`/print/stickers`) — not staff data, just a quantity picker. Two kinds,
+  sized to fit a small envelope:
+  - **Envelope Tag** — a blank To/From/Address/Notes label, filled in by hand after
+    printing, doubles as the envelope seal.
+  - **SCP Logo Sticker** — plain Foundation seal.
 
 Staff ID generation added four columns to the Staff tab: `Age`, `Born`, `Role Rank`,
-`Photo URL`. Existing sheets pick these up automatically (appended to the end of row 1)
-the first time the app reads the Staff tab after deploy.
+`Photo URL`. Existing sheets pick these up automatically (appended to the end of row 1,
+growing the sheet's column count if needed) the first time the app reads the Staff tab
+after deploy.
 
 ## Project structure
 
 ```
 app.py              Flask routes
 sheets_client.py     Google Sheets read/write helpers
-cards.py             PDF generation (keycards; more templates to come)
+cards.py             PDF generation (keycards, staff IDs, stickers)
 templates/           Jinja templates (dashboard, per-tile list/add views, print center)
 static/style.css      Styling
 render.yaml           Render Blueprint (service + env var slots)
