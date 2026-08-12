@@ -70,15 +70,23 @@ This repo includes a `render.yaml` blueprint.
 
 ## Print Center
 
-`/print` has three sub-sections:
+`/print` has three sub-sections. Keycards and Staff IDs both use
+`templates/print_staff_select.html` — a checklist of staff (leave nothing checked to
+include everyone) that posts to a `*_pdf` route which streams back a PDF built by
+`cards.py` (ReportLab; no external services or fonts needed). 8 CR80-sized cards per
+Letter page in both cases.
 
-- **Keycards** (`/print/keycards`) — pick staff from a checklist and download a print-ready
-  PDF (`/print/keycards/pdf`), 8 CR80-sized cards per Letter page, color-coded by
-  Clearance Level. Uses `cards.py` (ReportLab) to draw the cards directly — no external
-  services or fonts needed.
-- **Staff IDs** and **Stickers** — placeholder pages until their templates are provided.
-  Once a template is supplied, these get their own drawing function in `cards.py` and a
-  route mirroring `print_keycards`/`print_keycards_pdf`.
+- **Keycards** (`/print/keycards`) — color-coded by Clearance Level.
+- **Staff IDs** (`/print/staff-ids`) — Name/Role/Access Level/Role Rank/Born, a photo
+  (from the `Photo URL` column if set and reachable, otherwise a placeholder silhouette),
+  a Code128 barcode of the Staff ID, and an "Area" that's assigned deterministically at
+  print time (seeded by Staff ID, so it's stable across reprints) since there's no Area
+  column in the sheet — swap in a real column if you'd rather it be authored data.
+- **Stickers** — placeholder page until a template is provided.
+
+Staff ID generation added four columns to the Staff tab: `Age`, `Born`, `Role Rank`,
+`Photo URL`. Existing sheets pick these up automatically (appended to the end of row 1)
+the first time the app reads the Staff tab after deploy.
 
 ## Project structure
 
