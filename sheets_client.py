@@ -19,7 +19,19 @@ TABS = {
     },
     "staff": {
         "title": "Staff",
-        "headers": ["ID", "Name", "Role", "Clearance Level", "Site", "Status", "Contact"],
+        "headers": [
+            "ID",
+            "Name",
+            "Role",
+            "Clearance Level",
+            "Site",
+            "Status",
+            "Contact",
+            "Age",
+            "Born",
+            "Role Rank",
+            "Photo URL",
+        ],
     },
     "communications": {
         "title": "Communications",
@@ -68,6 +80,21 @@ def get_worksheet(key):
         values = ws.get_values("1:1")
         if not values or not values[0]:
             ws.append_row(config["headers"])
+        else:
+            # Schema additions (new columns appended to TABS[...]["headers"])
+            # get bolted onto the end of the existing header row here, so
+            # older sheets pick up new fields without disturbing column
+            # positions add_row()/append_row() already rely on.
+            existing = values[0]
+            missing = [h for h in config["headers"] if h not in existing]
+            if missing:
+                start_col = len(existing) + 1
+                end_col = start_col + len(missing) - 1
+                cell_range = "{}:{}".format(
+                    gspread.utils.rowcol_to_a1(1, start_col),
+                    gspread.utils.rowcol_to_a1(1, end_col),
+                )
+                ws.update(range_name=cell_range, values=[missing])
     except gspread.WorksheetNotFound:
         ws = ss.add_worksheet(title=config["title"], rows=200, cols=len(config["headers"]))
         ws.append_row(config["headers"])

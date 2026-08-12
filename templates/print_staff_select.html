@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Keycards // Print Center{% endblock %}
+{% block title %}{{ page_title }} // Print Center{% endblock %}
 {% block content %}
-  <h1 class="page-title">Keycards</h1>
+  <h1 class="page-title">{{ page_title }}</h1>
   <p class="page-subtitle">Select staff below, then download a print-ready PDF. Leave nothing selected to include everyone.</p>
 
   {% if error %}
     <div class="alert">Unable to reach the database: {{ error }}</div>
   {% endif %}
 
-  <form method="post" action="{{ url_for('print_keycards_pdf') }}">
+  <form method="post" action="{{ post_url }}">
     <section class="table-wrap">
       <table>
         <thead>

@@ -25,8 +25,8 @@ PRINT_TILES = [
     {
         "key": "staff_ids",
         "title": "Staff IDs",
-        "description": "Awaiting ID card template.",
-        "ready": False,
+        "description": "Bulk-generate staff ID badges as a printable PDF.",
+        "ready": True,
     },
     {
         "key": "stickers",
@@ -90,28 +90,39 @@ def print_hub():
     return render_template("print_hub.html", tiles=PRINT_TILES)
 
 
-@app.route("/print/keycards")
-def print_keycards():
+def _selected_staff_rows():
+    staff_rows = sc.get_rows("staff")
+    selected = request.form.getlist("selected")
+    if not selected:
+        return staff_rows
+    indices = {int(i) for i in selected if i.isdigit()}
+    return [row for idx, row in enumerate(staff_rows) if idx in indices]
+
+
+def _print_select_view(page_title, post_endpoint):
     error = None
     staff_rows = []
     try:
         staff_rows = sc.get_rows("staff")
     except Exception as exc:
         error = str(exc)
-    return render_template("print_keycards.html", staff_rows=staff_rows, error=error)
+    return render_template(
+        "print_staff_select.html",
+        page_title=page_title,
+        post_url=url_for(post_endpoint),
+        staff_rows=staff_rows,
+        error=error,
+    )
+
+
+@app.route("/print/keycards")
+def print_keycards():
+    return _print_select_view("Keycards", "print_keycards_pdf")
 
 
 @app.route("/print/keycards/pdf", methods=["POST"])
 def print_keycards_pdf():
-    staff_rows = sc.get_rows("staff")
-    selected = request.form.getlist("selected")
-
-    if selected:
-        indices = {int(i) for i in selected if i.isdigit()}
-        chosen = [row for idx, row in enumerate(staff_rows) if idx in indices]
-    else:
-        chosen = staff_rows
-
+    chosen = _selected_staff_rows()
     if not chosen:
         return redirect(url_for("print_keycards"))
 
@@ -126,7 +137,22 @@ def print_keycards_pdf():
 
 @app.route("/print/staff-ids")
 def print_staff_ids():
-    return render_template("print_placeholder.html", title="Staff IDs")
+    return _print_select_view("Staff IDs", "print_staff_ids_pdf")
+
+
+@app.route("/print/staff-ids/pdf", methods=["POST"])
+def print_staff_ids_pdf():
+    chosen = _selected_staff_rows()
+    if not chosen:
+        return redirect(url_for("print_staff_ids"))
+
+    pdf_buf = cards.build_staff_id_pdf(chosen)
+    return send_file(
+        pdf_buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="scp_staff_ids.pdf",
+    )
 
 
 @app.route("/print/stickers")
