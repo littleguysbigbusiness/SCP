@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">{{ title }}</h1>
+
+  {% if error %}
+    <div class="alert">
+      Unable to reach the database: {{ error }}
+    </div>
+  {% endif %}
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          {% for h in headers %}<th>{{ h }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% for h in headers %}<td>{{ row[h] }}</td>{% endfor %}
+          </tr>
+        {% else %}
+          <tr><td colspan="{{ headers|length }}" class="empty-row">No records on file.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="add-form">
+    <h2>Add Entry</h2>
+    <form method="post">
+      <div class="form-grid">
+        {% for h in headers %}
+          {% if not (key == 'communications' and h == 'Timestamp') %}
+            <label>
+              {{ h }}
+              {% if h == 'Description' or h == 'Containment Procedures' or h == 'Message' %}
+                <textarea name="{{ h }}" rows="3"></textarea>
+              {% else %}
+                <input type="text" name="{{ h }}">
+              {% endif %}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <button type="submit">Submit</button>
+    </form>
+  </section>
+{% endblock %}

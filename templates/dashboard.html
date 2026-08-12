@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Dashboard // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Foundation Dashboard</h1>
+  <p class="page-subtitle">Select a division to view records.</p>
+
+  <div class="tile-grid">
+    {% for tile in tiles %}
+      <a class="tile" href="{{ url_for(tile.key) }}">
+        <span class="tile-title">{{ tile.title }}</span>
+        <span class="tile-desc">{{ tile.description }}</span>
+        <span class="tile-count">
+          {% if counts[tile.key] is none %}
+            UNAVAILABLE
+          {% else %}
+            {{ counts[tile.key] }} record{{ '' if counts[tile.key] == 1 else 's' }}
+          {% endif %}
+        </span>
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

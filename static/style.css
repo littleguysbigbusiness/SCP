@@ -1,0 +1,208 @@
+:root {
+  --bg: #14161a;
+  --bg-panel: #1c1f24;
+  --border: #33383f;
+  --text: #d8dadd;
+  --text-dim: #8b9096;
+  --accent: #c9a13b;
+  --accent-dim: #7a6428;
+  --danger: #b04437;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 2px solid var(--accent-dim);
+  background: var(--bg-panel);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+}
+
+.brand-mark { color: var(--accent); font-size: 1.2rem; }
+
+.site-nav { display: flex; gap: 1.25rem; }
+.site-nav a {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+.site-nav a:hover { color: var(--accent); border-color: var(--accent); }
+
+.content {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.page-title {
+  margin: 0 0 0.4rem;
+  font-size: 1.6rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.page-subtitle { color: var(--text-dim); margin: 0 0 2rem; }
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 1.25rem;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.tile:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+.tile-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.tile-desc { color: var(--text-dim); font-size: 0.85rem; }
+
+.tile-count {
+  margin-top: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.table-wrap { overflow-x: auto; margin-bottom: 2.5rem; border: 1px solid var(--border); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+
+th, td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: var(--bg-panel);
+  color: var(--accent);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+td { color: var(--text); white-space: normal; }
+
+.empty-row { color: var(--text-dim); text-align: center; white-space: normal; }
+
+.add-form {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+}
+
+.add-form h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+input, textarea {
+  font-family: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+button {
+  font-family: inherit;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0.6rem 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+button:hover { background: var(--accent); color: var(--bg); }
+
+.alert {
+  background: rgba(176, 68, 55, 0.12);
+  border: 1px solid var(--danger);
+  color: #e0a89f;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.site-footer {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  border-top: 1px solid var(--border);
+}
