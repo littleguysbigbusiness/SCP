@@ -4,11 +4,16 @@
   <h1 class="page-title">Staff Lookup</h1>
   <p class="page-subtitle">Type a Staff ID or scan a keycard/badge barcode - it types the ID and hits Enter for you.</p>
 
-  <form method="get" class="add-form">
+  <form method="get" class="add-form" id="lookup-form">
+    <div class="scan-controls">
+      <button type="button" id="scan-btn">Scan with Camera</button>
+      <video id="scan-video" class="scan-video" autoplay playsinline muted></video>
+      <div id="scan-status" class="scan-status"></div>
+    </div>
     <div class="form-grid">
       <label>
         Staff ID
-        <input type="text" name="id" value="{{ query }}" autofocus autocomplete="off">
+        <input type="text" name="id" id="id-input" value="{{ query }}" autofocus autocomplete="off">
       </label>
     </div>
     <button type="submit">Look Up</button>
@@ -34,6 +39,59 @@
   {% endif %}
 
   <script>
-    document.querySelector('input[name="id"]').select();
+    document.getElementById('id-input').select();
+
+    (function () {
+      var scanBtn = document.getElementById('scan-btn');
+      var video = document.getElementById('scan-video');
+      var status = document.getElementById('scan-status');
+      var input = document.getElementById('id-input');
+      var form = document.getElementById('lookup-form');
+      var stream = null;
+      var pollTimer = null;
+
+      function stopScan() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+        video.classList.remove('active');
+      }
+
+      if (!('BarcodeDetector' in window)) {
+        scanBtn.addEventListener('click', function () {
+          status.textContent = 'Camera scanning is not supported in this browser. Try Chrome or Edge on Android, or use a USB barcode scanner / type the ID.';
+        });
+        return;
+      }
+
+      scanBtn.addEventListener('click', function () {
+        if (stream) { stopScan(); scanBtn.textContent = 'Scan with Camera'; return; }
+
+        status.textContent = 'Requesting camera access...';
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then(function (s) {
+            stream = s;
+            video.srcObject = s;
+            video.classList.add('active');
+            scanBtn.textContent = 'Stop Camera';
+            status.textContent = 'Point the camera at a barcode.';
+
+            var detector = new BarcodeDetector({ formats: ['code_128', 'qr_code'] });
+            pollTimer = setInterval(function () {
+              detector.detect(video).then(function (codes) {
+                if (codes.length > 0) {
+                  input.value = codes[0].rawValue;
+                  status.textContent = 'Scanned: ' + codes[0].rawValue;
+                  stopScan();
+                  scanBtn.textContent = 'Scan with Camera';
+                  form.submit();
+                }
+              }).catch(function () {});
+            }, 350);
+          })
+          .catch(function (err) {
+            status.textContent = 'Could not access camera: ' + err.message;
+          });
+      });
+    })();
   </script>
 {% endblock %}

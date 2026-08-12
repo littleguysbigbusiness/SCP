@@ -10,6 +10,26 @@ backed by a Google Sheet acting as the database. Deployed on Render as a web ser
 - If a tab doesn't exist yet, the app creates it automatically with the right headers
   the first time it's accessed.
 
+## Login and access control
+
+Every page except `/login` requires a session (`app.py`'s `before_request` hook, logic in
+`auth.py`). Logging in takes a **Name** (matched against the `Name` column in the Staff
+sheet, case-insensitive) and a **password shared by everyone** — `STAFF_LOGIN_PASSWORD`,
+defaulting to `123456`. There's no per-user password; anyone who knows the shared password
+and a valid staff name can log in as that person. That's a low security bar by design for a
+small home-server tool, but change `STAFF_LOGIN_PASSWORD` to something non-default if this
+is reachable from outside your own network.
+
+Who gets what after logging in is decided by `auth.is_privileged()`, which checks the
+matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" or "site
+director" (case-insensitive substring match):
+
+- **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Print.
+- **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
+  page. Any other URL redirects there.
+
+If your sheet encodes O5/Director status differently, adjust the check in `auth.py`.
+
 ## One-time setup: Google service account
 
 The app needs its own Google identity with edit access to your sheet (the "anyone with
@@ -54,6 +74,7 @@ it shows an error and leaves the Archives entry unsaved rather than saving a bro
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | The full JSON key file contents, as a single-line string |
 | `GOOGLE_DRIVE_FOLDER_ID` | ID of a Drive folder shared with the service account (Editor), for Archives → Scan Document uploads |
 | `SECRET_KEY` | Any random string, used for Flask session signing |
+| `STAFF_LOGIN_PASSWORD` | Shared login password for all staff. Defaults to `123456` if unset — **change this on Render** since it's the one thing gating the whole site |
 
 See `.env.example` for the format.
 
@@ -129,6 +150,12 @@ the scanned text, then sends Enter as if from a keyboard). Scanning a keycard's 
 typing a Staff ID both look up and display that person's full record. No match just shows
 "not found" rather than erroring.
 
+There's also a **Scan with Camera** button that uses the browser's `BarcodeDetector` API
+(Code128 + QR) directly against the device camera — no external library, no server round
+trip for the scan itself. It's only supported in Chromium-based browsers (Chrome/Edge,
+notably including Android) — Safari and Firefox don't implement `BarcodeDetector`, so the
+button shows a message pointing to USB-scanner/manual-entry instead of failing silently.
+
 ## Archives → Scan Document
 
 `/archives/scan` (linked from the Archives page) uploads a photo or PDF of a document
@@ -143,12 +170,13 @@ with a dead link.
 ## Project structure
 
 ```
-app.py              Flask routes
+app.py              Flask routes + login/access-control hook
+auth.py               Login matching + O5/Site Director privilege check
 sheets_client.py     Google Sheets read/write helpers
 drive_client.py       Google Drive upload helper (Archives scans)
 cards.py             PDF generation (keycards, staff IDs, stickers)
 templates/           Jinja templates (dashboard, per-tile list/add views, print center,
-                      staff lookup, archives scan)
+                      staff lookup, archives scan, login, staff duties)
 static/style.css      Styling
 static/assets/         Bundled static assets (Foundation emblem SVG)
 render.yaml           Render Blueprint (service + env var slots)

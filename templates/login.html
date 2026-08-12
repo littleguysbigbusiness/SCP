@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Personnel Access // SCP Foundation{% endblock %}
+{% block content %}
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="stamp">RESTRICTED<br>ACCESS</div>
+      <h1 class="page-title">Foundation Personnel Access</h1>
+      <p class="page-subtitle">Authorized personnel only. All access attempts are logged.</p>
+
+      {% if error %}
+        <div class="alert">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" class="add-form">
+        <div class="form-grid">
+          <label>
+            Name
+            <input type="text" name="name" autofocus autocomplete="username" required>
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+        </div>
+        <button type="submit">Log In</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

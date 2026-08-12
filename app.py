@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, render_template, request, send_file, url_for
+from flask import Flask, redirect, render_template, request, send_file, session, url_for
 
+import auth
 import cards
 import drive_client
 import sheets_client as sc
@@ -10,6 +11,54 @@ import sheets_client as sc
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+
+@app.before_request
+def _require_login():
+    endpoint = request.endpoint
+    if endpoint is None or endpoint in auth.OPEN_ENDPOINTS:
+        return
+    if "staff_name" not in session:
+        return redirect(url_for("login"))
+    if not session.get("privileged") and endpoint not in auth.UNPRIVILEGED_ENDPOINTS:
+        return redirect(url_for("staff_duties"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        name = request.form.get("name", "")
+        password = request.form.get("password", "")
+        if password != auth.LOGIN_PASSWORD:
+            error = "Incorrect password."
+        else:
+            try:
+                staff_row = auth.find_staff_by_name(name)
+            except Exception as exc:
+                staff_row = None
+                error = "Unable to reach the database: {}".format(exc)
+            if staff_row is None and error is None:
+                error = "No staff member found with that name."
+            if staff_row is not None:
+                session.clear()
+                session["staff_name"] = staff_row.get("Name")
+                session["staff_id"] = staff_row.get("ID")
+                session["privileged"] = auth.is_privileged(staff_row)
+                return redirect(url_for("dashboard" if session["privileged"] else "staff_duties"))
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/staff-duties")
+def staff_duties():
+    return render_template("staff_duties.html")
+
 
 TILES = [
     {"key": "archives", "title": "Archives", "description": "SCP object records and containment data."},

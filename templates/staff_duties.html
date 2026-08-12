@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Staff Duties // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Staff Duties</h1>
+  <p class="page-subtitle">Welcome, {{ session.get('staff_name', 'Staff') }}. Standard duty guidelines are listed below.</p>
+
+  <section class="table-wrap">
+    <table>
+      <tbody>
+        <tr><th>Report</th><td>Check in with your site supervisor at the start of each shift.</td></tr>
+        <tr><th>Clearance</th><td>Only access areas and files your clearance level permits. Report anomalies immediately.</td></tr>
+        <tr><th>Containment</th><td>Follow posted containment procedures exactly. Do not improvise around a containment breach.</td></tr>
+        <tr><th>Communication</th><td>Use approved channels only. Do not discuss Foundation work outside of secure Foundation facilities.</td></tr>
+        <tr><th>Incidents</th><td>Report all incidents, no matter how minor, to your supervisor before end of shift.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p class="page-subtitle">Higher-clearance systems (Archives, Staff, Print, Communications) are restricted to O5 Council and Site Directors.</p>
+{% endblock %}

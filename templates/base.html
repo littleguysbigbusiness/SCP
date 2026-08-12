@@ -9,15 +9,29 @@
 <body>
   <header class="site-header">
     <a class="brand" href="{{ url_for('dashboard') }}">
-      <span class="brand-mark">&#9711;</span>
+      <span class="brand-mark">
+        <svg viewBox="0 0 135 135" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="67.7" cy="71.5" r="33" stroke-width="6"/>
+          <path d="m51.9 11.9h31.7l3.07 11.4.944.391c19.4 8.03 32 26.9 32 47.9 0 2.26-.149 4.53-.445 6.77l-.133 1.01 8.37 8.37-15.8 27.4-11.4-3.06-.809.623c-9.06 6.95-20.2 10.7-31.6 10.7-11.4 6e-5-22.5-3.77-31.6-10.7l-.81-.623-11.4 3.06-15.8-27.4 8.37-8.37-.133-1.01c-.296-2.25-.445-4.51-.445-6.77.000141-21 12.6-39.9 32-47.9l.944-.391z" stroke-width="4"/>
+          <path id="scp-emblem-arrow" d="m64.7 30.6v24h-5.08l8.08 14 8.08-14h-5.08l-.000265-24h-5.99" fill="currentColor" stroke="none"/>
+          <use id="scp-emblem-arrow-2" transform="rotate(120 67.7 71.5)" xlink:href="#scp-emblem-arrow"/>
+          <use transform="rotate(120 67.7 71.5)" xlink:href="#scp-emblem-arrow-2"/>
+        </svg>
+      </span>
       <span class="brand-text">SECURE. CONTAIN. PROTECT.</span>
     </a>
-    <nav class="site-nav">
-      <a href="{{ url_for('archives') }}">Archives</a>
-      <a href="{{ url_for('staff') }}">Staff</a>
-      <a href="{{ url_for('communications') }}">Communications</a>
-      <a href="{{ url_for('print_hub') }}">Print</a>
-    </nav>
+    {% if session.get('staff_name') %}
+      <nav class="site-nav">
+        {% if session.get('privileged') %}
+          <a href="{{ url_for('archives') }}">Archives</a>
+          <a href="{{ url_for('staff') }}">Staff</a>
+          <a href="{{ url_for('communications') }}">Communications</a>
+          <a href="{{ url_for('print_hub') }}">Print</a>
+        {% endif %}
+        <a href="{{ url_for('staff_duties') }}">Staff Duties</a>
+        <a href="{{ url_for('logout') }}">Log Out ({{ session['staff_name'] }})</a>
+      </nav>
+    {% endif %}
   </header>
   <main class="content">
     {% block content %}{% endblock %}
