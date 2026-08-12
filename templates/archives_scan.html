@@ -2,19 +2,27 @@
 {% block title %}Scan Document // Archives{% endblock %}
 {% block content %}
   <h1 class="page-title">Scan Document</h1>
-  <p class="page-subtitle">Upload a photo or PDF of a document - it's stored in Drive and filed as a new Archives entry.</p>
+  <p class="page-subtitle">Upload a photo or PDF of a document. AI reads it and fills in the fields below - review before saving.</p>
 
   {% if error %}
     <div class="alert">{{ error }}</div>
   {% endif %}
 
   <section class="add-form">
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="scan-form">
       <div class="form-grid">
         <label>
           Document (image or PDF)
-          <input type="file" name="document" accept="image/*,application/pdf">
+          <input type="file" name="document" id="document-input" accept="image/*,application/pdf">
         </label>
+      </div>
+
+      <div class="scan-controls">
+        <button type="button" id="ai-read-btn">Read with AI</button>
+        <div id="ai-status" class="scan-status"></div>
+      </div>
+
+      <div class="form-grid">
         {% for h in fields %}
           <label>
             {{ h }}
@@ -29,4 +37,55 @@
       <button type="submit">Save to Archives</button>
     </form>
   </section>
+
+  <script>
+    (function () {
+      var fileInput = document.getElementById('document-input');
+      var btn = document.getElementById('ai-read-btn');
+      var status = document.getElementById('ai-status');
+
+      var FIELD_MAP = {
+        'Designation': 'designation',
+        'Object Class': 'object_class',
+        'Description': 'description',
+        'Containment Procedures': 'containment_procedures'
+      };
+
+      function readWithAI() {
+        var file = fileInput.files[0];
+        if (!file) {
+          status.textContent = 'Choose a file first.';
+          return;
+        }
+        status.textContent = 'Reading document with AI...';
+        var data = new FormData();
+        data.append('document', file);
+
+        fetch('{{ url_for("archives_scan_analyze") }}', { method: 'POST', body: data })
+          .then(function (r) {
+            return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+          })
+          .then(function (result) {
+            if (!result.ok) {
+              status.textContent = 'Could not read document: ' + (result.body.error || 'unknown error');
+              return;
+            }
+            Object.keys(FIELD_MAP).forEach(function (label) {
+              var el = document.querySelector('[name="' + label + '"]');
+              var value = result.body[FIELD_MAP[label]];
+              if (el && value !== undefined) {
+                el.value = value;
+              }
+            });
+            status.textContent = 'Fields filled in from the document - review before saving.';
+          })
+          .catch(function (err) {
+            status.textContent = 'Could not read document: ' + err.message;
+          });
+      }
+
+      btn.addEventListener('click', readWithAI);
+      fileInput.addEventListener('change', readWithAI);
+    })();
+  </script>
 {% endblock %}

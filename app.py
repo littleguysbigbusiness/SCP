@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
 
+import ai_client
 import auth
 import cards
 import drive_client
@@ -151,6 +152,18 @@ def archives_scan():
         return redirect(url_for("archives"))
 
     return render_template("archives_scan.html", fields=fields, error=None, form={})
+
+
+@app.route("/archives/scan/analyze", methods=["POST"])
+def archives_scan_analyze():
+    file = request.files.get("document")
+    if not file or not file.filename:
+        return jsonify({"error": "No file provided."}), 400
+    try:
+        data = ai_client.extract_archive_fields(file.read(), file.mimetype)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+    return jsonify(data)
 
 
 @app.route("/staff", methods=["GET", "POST"])
