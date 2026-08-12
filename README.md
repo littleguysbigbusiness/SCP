@@ -76,9 +76,13 @@ include everyone) that posts to a `*_pdf` route which streams back a PDF built b
 `cards.py` (ReportLab; no external services or fonts needed). 8 CR80-sized cards per
 Letter page in both cases.
 
-- **Keycards** (`/print/keycards`) — color-coded by Clearance Level.
+- **Keycards** (`/print/keycards`) — modeled on the classic SCP wiki keycard set: colored
+  top band (wordmark, emblem, tagline, a QR code encoding the Staff ID, arrow icon), white
+  "LEVEL n" band with the standard warning text, solid color footer. Numbered Clearance
+  Levels (0-5) get their canonical color with black text; anything else (blank, "O5", or
+  unrecognized) falls back to the dark blue undesignated card with white text.
 - **Staff IDs** (`/print/staff-ids`) — Name/Role/Access Level/Role Rank/Born, a photo
-  (from the `Photo URL` column if set and reachable, otherwise a placeholder silhouette),
+  (from the `Photo URL` column if set and reachable, otherwise a plain "N/A" placeholder),
   a Code128 barcode of the Staff ID, and an "Area" that's assigned deterministically at
   print time (seeded by Staff ID, so it's stable across reprints) since there's no Area
   column in the sheet — swap in a real column if you'd rather it be authored data.
@@ -92,6 +96,12 @@ Staff ID generation added four columns to the Staff tab: `Age`, `Born`, `Role Ra
 `Photo URL`. Existing sheets pick these up automatically (appended to the end of row 1,
 growing the sheet's column count if needed) the first time the app reads the Staff tab
 after deploy.
+
+The Foundation emblem (`static/assets/scp_logo.svg`, the official mark from the SCP wiki,
+CC BY-SA per the wiki's licensing) is rendered onto cards via `svglib` — parsed once into
+a ReportLab Drawing, then deep-copied and recolored per use (e.g. white on a dark badge
+header, black elsewhere) instead of rasterizing to a fixed-color PNG. Used on Staff IDs,
+Keycards, and the SCP Logo Sticker.
 
 ## Project structure
 
