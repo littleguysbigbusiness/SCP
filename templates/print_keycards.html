@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Keycards // Print Center{% endblock %}
+{% block content %}
+  <h1 class="page-title">Keycards</h1>
+  <p class="page-subtitle">Select staff below, then download a print-ready PDF. Leave nothing selected to include everyone.</p>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('print_keycards_pdf') }}">
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all"></th>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Clearance Level</th>
+            <th>Site</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in staff_rows %}
+            <tr>
+              <td><input type="checkbox" name="selected" value="{{ loop.index0 }}" class="row-check"></td>
+              <td>{{ row["ID"] }}</td>
+              <td>{{ row["Name"] }}</td>
+              <td>{{ row["Role"] }}</td>
+              <td>{{ row["Clearance Level"] }}</td>
+              <td>{{ row["Site"] }}</td>
+              <td>{{ row["Status"] }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="empty-row">No staff on file.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <button type="submit">Download PDF</button>
+  </form>
+
+  <script>
+    document.getElementById("select-all").addEventListener("change", function () {
+      document.querySelectorAll(".row-check").forEach(function (box) {
+        box.checked = this.checked;
+      }.bind(this));
+    });
+  </script>
+{% endblock %}

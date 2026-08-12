@@ -92,6 +92,14 @@ a { color: var(--accent); text-decoration: none; }
 
 .tile:hover { border-color: var(--accent); transform: translateY(-2px); }
 
+.tile-disabled {
+  border-left-color: var(--border);
+  opacity: 0.55;
+  cursor: default;
+}
+.tile-disabled:hover { transform: none; border-color: var(--border); }
+.tile-disabled .tile-count { color: var(--text-dim); }
+
 .tile-title {
   font-size: 1.1rem;
   font-weight: bold;

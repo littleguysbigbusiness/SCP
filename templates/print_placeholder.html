@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} // Print Center{% endblock %}
+{% block content %}
+  <h1 class="page-title">{{ title }}</h1>
+  <p class="page-subtitle">This section is waiting on a template. Once it's provided, this page will generate {{ title|lower }} the same way Keycards does.</p>
+  <p><a href="{{ url_for('print_hub') }}">&laquo; Back to Print Center</a></p>
+{% endblock %}

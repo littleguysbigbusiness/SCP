@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, send_file, url_for
 
+import cards
 import sheets_client as sc
 
 app = Flask(__name__)
@@ -12,6 +13,27 @@ TILES = [
     {"key": "archives", "title": "Archives", "description": "SCP object records and containment data."},
     {"key": "staff", "title": "Staff", "description": "Personnel roster and clearance levels."},
     {"key": "communications", "title": "Communications", "description": "Internal message and incident log."},
+]
+
+PRINT_TILES = [
+    {
+        "key": "keycards",
+        "title": "Keycards",
+        "description": "Bulk-generate staff keycards as a printable PDF.",
+        "ready": True,
+    },
+    {
+        "key": "staff_ids",
+        "title": "Staff IDs",
+        "description": "Awaiting ID card template.",
+        "ready": False,
+    },
+    {
+        "key": "stickers",
+        "title": "Stickers",
+        "description": "Awaiting sticker template.",
+        "ready": False,
+    },
 ]
 
 
@@ -61,6 +83,55 @@ def staff():
 @app.route("/communications", methods=["GET", "POST"])
 def communications():
     return _list_view("communications", "Communications")
+
+
+@app.route("/print")
+def print_hub():
+    return render_template("print_hub.html", tiles=PRINT_TILES)
+
+
+@app.route("/print/keycards")
+def print_keycards():
+    error = None
+    staff_rows = []
+    try:
+        staff_rows = sc.get_rows("staff")
+    except Exception as exc:
+        error = str(exc)
+    return render_template("print_keycards.html", staff_rows=staff_rows, error=error)
+
+
+@app.route("/print/keycards/pdf", methods=["POST"])
+def print_keycards_pdf():
+    staff_rows = sc.get_rows("staff")
+    selected = request.form.getlist("selected")
+
+    if selected:
+        indices = {int(i) for i in selected if i.isdigit()}
+        chosen = [row for idx, row in enumerate(staff_rows) if idx in indices]
+    else:
+        chosen = staff_rows
+
+    if not chosen:
+        return redirect(url_for("print_keycards"))
+
+    pdf_buf = cards.build_keycards_pdf(chosen)
+    return send_file(
+        pdf_buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="scp_keycards.pdf",
+    )
+
+
+@app.route("/print/staff-ids")
+def print_staff_ids():
+    return render_template("print_placeholder.html", title="Staff IDs")
+
+
+@app.route("/print/stickers")
+def print_stickers():
+    return render_template("print_placeholder.html", title="Stickers")
 
 
 if __name__ == "__main__":

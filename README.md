@@ -68,12 +68,25 @@ This repo includes a `render.yaml` blueprint.
    `sync: false` — paste in the values from the setup steps above.
 4. Deploy. The start command is `gunicorn app:app`.
 
+## Print Center
+
+`/print` has three sub-sections:
+
+- **Keycards** (`/print/keycards`) — pick staff from a checklist and download a print-ready
+  PDF (`/print/keycards/pdf`), 8 CR80-sized cards per Letter page, color-coded by
+  Clearance Level. Uses `cards.py` (ReportLab) to draw the cards directly — no external
+  services or fonts needed.
+- **Staff IDs** and **Stickers** — placeholder pages until their templates are provided.
+  Once a template is supplied, these get their own drawing function in `cards.py` and a
+  route mirroring `print_keycards`/`print_keycards_pdf`.
+
 ## Project structure
 
 ```
 app.py              Flask routes
 sheets_client.py     Google Sheets read/write helpers
-templates/           Jinja templates (dashboard + per-tile list/add views)
+cards.py             PDF generation (keycards; more templates to come)
+templates/           Jinja templates (dashboard, per-tile list/add views, print center)
 static/style.css      Styling
 render.yaml           Render Blueprint (service + env var slots)
 requirements.txt

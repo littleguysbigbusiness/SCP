@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Print Center // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Print Center</h1>
+  <p class="page-subtitle">Generate printable materials from Foundation records.</p>
+
+  <div class="tile-grid">
+    {% for tile in tiles %}
+      {% if tile.ready %}
+        <a class="tile" href="{{ url_for('print_' + tile.key) }}">
+          <span class="tile-title">{{ tile.title }}</span>
+          <span class="tile-desc">{{ tile.description }}</span>
+          <span class="tile-count">Ready</span>
+        </a>
+      {% else %}
+        <div class="tile tile-disabled">
+          <span class="tile-title">{{ tile.title }}</span>
+          <span class="tile-desc">{{ tile.description }}</span>
+          <span class="tile-count">Awaiting Template</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endblock %}
