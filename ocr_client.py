@@ -1,10 +1,17 @@
 import io
+import os
 import re
+import shutil
 
 import pytesseract
 from PIL import Image
 
 MAX_PDF_PAGES = 5
+
+if os.name == "nt" and shutil.which("tesseract") is None:
+    _default_windows_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    if os.path.isfile(_default_windows_path):
+        pytesseract.pytesseract.tesseract_cmd = _default_windows_path
 
 _LABEL_RE = re.compile(
     r"(?:(?P<designation>item\s*#)|"

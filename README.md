@@ -73,8 +73,11 @@ Tesseract — no external API or account needed. It works best on documents form
 a Foundation article (`Item #:`, `Object Class:`, `Special Containment Procedures:`,
 `Description:` labels), since those labels are what it uses to fill in the fields.
 
-- **On Render**: `render.yaml`'s `buildCommand` already installs the `tesseract-ocr` and
-  `poppler-utils` system packages, so no setup is needed.
+- **On Render**: the service runs as a Docker deploy (`Dockerfile` at the repo root), which
+  installs `tesseract-ocr` and `poppler-utils` as part of the image build, so no setup is
+  needed. Render's native Python runtime can't install system packages at build time (its
+  build filesystem is read-only outside of `pip`), which is why this needs Docker instead
+  of a plain `buildCommand`.
 - **Running locally**: install Tesseract OCR yourself and make sure it's on your `PATH`.
   - Windows: install the [UB Mannheim Tesseract build](https://github.com/UB-Mannheim/tesseract/wiki).
   - macOS: `brew install tesseract poppler`
@@ -124,7 +127,8 @@ This repo includes a `render.yaml` blueprint.
 3. Render will create a web service from `render.yaml`. It will prompt you for the secret
    env vars (`GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_DRIVE_FOLDER_ID`)
    since they're marked `sync: false` — paste in the values from the setup steps above.
-4. Deploy. The start command is `gunicorn app:app`.
+4. Deploy. Render builds the `Dockerfile` and starts it with `gunicorn app:app`, per the
+   Dockerfile's `CMD`.
 
 ## Print Center
 
@@ -210,6 +214,7 @@ templates/           Jinja templates (dashboard, per-tile list/add views, print 
                       staff lookup, archives scan, login, staff duties)
 static/style.css      Styling
 static/assets/         Bundled static assets (Foundation emblem SVG)
-render.yaml           Render Blueprint (service + env var slots)
+render.yaml           Render Blueprint (Docker service + env var slots)
+Dockerfile             Image build: installs Tesseract/Poppler, then the app
 requirements.txt
 ```
