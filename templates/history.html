@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Edit History // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Edit History</h1>
+  <p class="page-subtitle">Audit log of every edit made to Archives, Staff, and Communications records.</p>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% else %}
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Tab</th>
+            <th>Record ID</th>
+            <th>Editor</th>
+            <th>Changes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.get('Timestamp', '') }}</td>
+              <td>{{ r.get('Tab', '') }}</td>
+              <td>{{ r.get('Record ID', '') }}</td>
+              <td>{{ r.get('Editor', '') }}</td>
+              <td>{{ r.get('Changes', '') }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="empty-row">No edits on file.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -153,9 +153,61 @@ def _list_view(key, title):
     )
 
 
+def _summarize_changes(headers, old_row, new_values):
+    parts = []
+    for h in headers:
+        old_v = str(old_row.get(h, ""))
+        new_v = str(new_values.get(h, ""))
+        if old_v != new_v:
+            parts.append('{}: "{}" -> "{}"'.format(h, old_v, new_v))
+    return "; ".join(parts)
+
+
+def _edit_view(key, title, record_id):
+    config = sc.TABS[key]
+    headers = config["headers"]
+
+    if request.method == "POST":
+        new_values = {h: request.form.get(h, "").strip() for h in headers}
+        old_row = sc.update_row(key, record_id, new_values)
+        if old_row is not None:
+            changes = _summarize_changes(headers, old_row, new_values)
+            if changes:
+                sc.add_row(
+                    "edit_history",
+                    {
+                        "Timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                        "Tab": config["title"],
+                        "Record ID": record_id,
+                        "Editor": session.get("staff_name", ""),
+                        "Changes": changes,
+                    },
+                )
+        return redirect(url_for(key))
+
+    error = None
+    row = None
+    try:
+        rows = sc.get_rows(key)
+        row = next((r for r in rows if str(r.get("ID", "")) == str(record_id)), None)
+    except Exception as exc:
+        error = str(exc)
+    if row is None and error is None:
+        error = 'No record found with ID "{}".'.format(record_id)
+
+    return render_template(
+        "edit.html", title=title, headers=headers, row=row or {}, key=key, error=error, record_id=record_id
+    )
+
+
 @app.route("/archives", methods=["GET", "POST"])
 def archives():
     return _list_view("archives", "Archives")
+
+
+@app.route("/archives/edit/<record_id>", methods=["GET", "POST"])
+def archives_edit(record_id):
+    return _edit_view("archives", "Edit Archives Record", record_id)
 
 
 @app.route("/archives/scan", methods=["GET", "POST"])
@@ -202,6 +254,11 @@ def staff():
     return _list_view("staff", "Staff")
 
 
+@app.route("/staff/edit/<record_id>", methods=["GET", "POST"])
+def staff_edit(record_id):
+    return _edit_view("staff", "Edit Staff Record", record_id)
+
+
 @app.route("/staff/lookup")
 def staff_lookup():
     query = request.args.get("id", "").strip()
@@ -221,6 +278,22 @@ def staff_lookup():
 @app.route("/communications", methods=["GET", "POST"])
 def communications():
     return _list_view("communications", "Communications")
+
+
+@app.route("/communications/edit/<record_id>", methods=["GET", "POST"])
+def communications_edit(record_id):
+    return _edit_view("communications", "Edit Communications Record", record_id)
+
+
+@app.route("/history")
+def edit_history():
+    error = None
+    rows = []
+    try:
+        rows = list(reversed(sc.get_rows("edit_history")))
+    except Exception as exc:
+        error = str(exc)
+    return render_template("history.html", rows=rows, error=error)
 
 
 @app.route("/comms", methods=["GET", "POST"])

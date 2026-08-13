@@ -324,7 +324,7 @@ def _draw_id_card(c, x, y, staff):
     c.setFont("Helvetica", 6.5)
     c.setFillColor(colors.HexColor("#8b9096"))
     area = staff.get("Area") or _assign_area(staff.get("ID", ""))
-    c.drawRightString(x + CARD_WIDTH - pad, content_top, "AREA: {}".format(area))
+    c.drawRightString(x + CARD_WIDTH - pad, content_top, "AREA: {}".format(str(area)[:30]))
 
     photo_w = photo_h = 0.85 * inch
     photo_x = x + CARD_WIDTH - pad - photo_w

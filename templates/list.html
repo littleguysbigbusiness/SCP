@@ -20,6 +20,7 @@
       <thead>
         <tr>
           {% for h in headers %}<th>{{ h }}</th>{% endfor %}
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -38,9 +39,10 @@
                 {% endif %}
               </td>
             {% endfor %}
+            <td><a href="{{ url_for(key ~ '_edit', record_id=row['ID']) }}">Edit</a></td>
           </tr>
         {% else %}
-          <tr><td colspan="{{ headers|length }}" class="empty-row">No records on file.</td></tr>
+          <tr><td colspan="{{ headers|length + 1 }}" class="empty-row">No records on file.</td></tr>
         {% endfor %}
       </tbody>
     </table>

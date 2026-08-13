@@ -182,6 +182,19 @@ in and posts.
   entry: `ID`, `Timestamp`, `Role`, `From`, `Message`) — separate from the general
   `Communications` incident log, which stays privileged-only.
 
+## Editing records + Edit History
+
+Archives, Staff, and Communications rows can now be edited, not just added. Each row in
+those tables has an **Edit** link (`/archives/edit/<id>`, `/staff/edit/<id>`,
+`/communications/edit/<id>`) that opens a pre-filled form; saving it overwrites that row in
+the Sheet in place via `sheets_client.update_row()`, which finds the row by matching the
+`ID` column. Privileged-only, same as the tables themselves.
+
+Every save that actually changes something logs a row to a new `Edit History` Sheet tab
+(`Timestamp`, `Tab`, `Record ID`, `Editor`, `Changes`) — `Changes` is a plain-text diff of
+just the fields that changed, e.g. `Area: "" -> "Area 12"`. View it at `/history` (linked
+as "History" in the nav for privileged users), newest first.
+
 ## Staff Lookup
 
 `/staff/lookup` (linked from the Staff page) is a single ID input, auto-focused, that

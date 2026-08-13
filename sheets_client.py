@@ -53,6 +53,10 @@ TABS = {
         "title": "Role Comms",
         "headers": ["ID", "Timestamp", "Role", "From", "Message"],
     },
+    "edit_history": {
+        "title": "Edit History",
+        "headers": ["Timestamp", "Tab", "Record ID", "Editor", "Changes"],
+    },
 }
 
 _credentials = None
@@ -146,3 +150,24 @@ def add_row(key, row_dict):
     ws = get_worksheet(key)
     ws.append_row([row_dict.get(h, "") for h in headers])
     _rows_cache.pop(key, None)
+
+
+def update_row(key, record_id, new_values):
+    """Overwrites the row whose ID matches record_id with new_values.
+
+    Returns the row's prior values (a dict), or None if no row with that ID
+    was found.
+    """
+    headers = TABS[key]["headers"]
+    ws = get_worksheet(key)
+    records = ws.get_all_records()
+    for i, record in enumerate(records):
+        if str(record.get("ID", "")) == str(record_id):
+            row_index = i + 2  # +1 for the header row, +1 for 1-indexing
+            values = [new_values.get(h, "") for h in headers]
+            start = gspread.utils.rowcol_to_a1(row_index, 1)
+            end = gspread.utils.rowcol_to_a1(row_index, len(headers))
+            ws.update(range_name="{}:{}".format(start, end), values=[values])
+            _rows_cache.pop(key, None)
+            return record
+    return None

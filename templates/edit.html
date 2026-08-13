@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">{{ title }}</h1>
+  <p class="page-subtitle"><a href="{{ url_for('edit_history') }}">View edit history &raquo;</a></p>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% else %}
+    <section class="add-form">
+      <h2>Edit Entry</h2>
+      <form method="post">
+        <div class="form-grid">
+          {% for h in headers %}
+            <label>
+              {{ h }}
+              {% if h == 'ID' %}
+                <input type="text" name="{{ h }}" value="{{ row.get(h, record_id) }}" readonly>
+              {% elif h == 'Description' or h == 'Containment Procedures' or h == 'Message' %}
+                <textarea name="{{ h }}" rows="3">{{ row.get(h, '') }}</textarea>
+              {% else %}
+                <input type="text" name="{{ h }}" value="{{ row.get(h, '') }}">
+              {% endif %}
+            </label>
+          {% endfor %}
+        </div>
+        <button type="submit">Save Changes</button>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}
