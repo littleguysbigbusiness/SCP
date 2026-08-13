@@ -145,17 +145,17 @@ Letter page in both cases.
   unrecognized) falls back to the dark blue undesignated card with white text.
 - **Staff IDs** (`/print/staff-ids`) — Name/Role/Access Level/Role Rank/Born, a photo
   (from the `Photo URL` column if set and reachable, otherwise a plain "N/A" placeholder),
-  a Code128 barcode of the Staff ID, and an "Area" that's assigned deterministically at
-  print time (seeded by Staff ID, so it's stable across reprints) since there's no Area
-  column in the sheet — swap in a real column if you'd rather it be authored data.
+  a Code128 barcode of the Staff ID, and an "Area" printed from the `Area` column. If left
+  blank for a given staff member, it falls back to one assigned deterministically at print
+  time (seeded by Staff ID, so it's stable across reprints) rather than printing nothing.
 - **Stickers** (`/print/stickers`) — not staff data, just a quantity picker. Two kinds,
   sized to fit a small envelope:
-  - **Envelope Tag** — a blank To/From/Address/Notes label, filled in by hand after
-    printing, doubles as the envelope seal.
+  - **Envelope Tag** — a blank To/From/Mail Back To/Address/Notes label, filled in by hand
+    after printing, doubles as the envelope seal.
   - **SCP Logo Sticker** — plain Foundation seal.
 
-Staff ID generation added four columns to the Staff tab: `Age`, `Born`, `Role Rank`,
-`Photo URL`. Existing sheets pick these up automatically (appended to the end of row 1,
+Staff ID generation added five columns to the Staff tab: `Age`, `Born`, `Role Rank`,
+`Photo URL`, `Area`. Existing sheets pick these up automatically (appended to the end of row 1,
 growing the sheet's column count if needed) the first time the app reads the Staff tab
 after deploy.
 
@@ -164,6 +164,23 @@ CC BY-SA per the wiki's licensing) is rendered onto cards via `svglib` — parse
 a ReportLab Drawing, then deep-copied and recolored per use (e.g. white on a dark badge
 header, black elsewhere) instead of rasterizing to a fixed-color PNG. Used on Staff IDs,
 Keycards, and the SCP Logo Sticker.
+
+## Role Comms
+
+`/comms` (linked as "Role Comms" in the nav, reachable by every logged-in staff member —
+it's in `auth.UNPRIVILEGED_ENDPOINTS`, unlike the rest of the privileged-only tiles) is a
+simple message board scoped to a staff member's `Role` column value in the Staff sheet.
+There's no fixed list of roles — whatever text is in a given staff member's `Role` field
+becomes their channel, so a new role just works the first time someone with that role logs
+in and posts.
+
+- **Regular staff** only ever see and post to their own role's channel (from
+  `session["staff_role"]`, set at login) — no picker, no way to see other channels.
+- **Site Directors and O5** (already privileged everywhere else) get a channel dropdown
+  populated from every distinct `Role` value on file, and can read/post to any of them.
+- Messages live in their own `Role Comms` Sheet tab (`sheets_client.py`'s `role_comms`
+  entry: `ID`, `Timestamp`, `Role`, `From`, `Message`) — separate from the general
+  `Communications` incident log, which stays privileged-only.
 
 ## Staff Lookup
 

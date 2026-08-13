@@ -263,7 +263,7 @@ label {
   letter-spacing: 0.03em;
 }
 
-input, textarea {
+input, textarea, select {
   font-family: inherit;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -273,7 +273,7 @@ input, textarea {
   resize: vertical;
 }
 
-input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 
 button {
   font-family: inherit;
@@ -310,10 +310,10 @@ button:hover { background: var(--accent); color: var(--bg); }
 .hazard-bar {
   background: repeating-linear-gradient(
     135deg,
-    #0d0e10,
-    #0d0e10 14px,
-    var(--accent-dim) 14px,
-    var(--accent-dim) 28px
+    #000000,
+    #000000 14px,
+    #ffffff 14px,
+    #ffffff 28px
   );
   border-bottom: 1px solid var(--border);
   padding: 0.35rem 1rem;
@@ -322,8 +322,8 @@ button:hover { background: var(--accent); color: var(--bg); }
 
 .hazard-bar span {
   display: inline-block;
-  background: var(--bg);
-  color: var(--accent);
+  background: #000000;
+  color: #ffffff;
   font-size: 0.65rem;
   font-weight: bold;
   letter-spacing: 0.12em;

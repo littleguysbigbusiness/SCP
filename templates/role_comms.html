@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Role Comms // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Role Comms</h1>
+
+  {% if privileged %}
+    <p class="page-subtitle">
+      Viewing the <strong>{{ selected_role or 'unassigned' }}</strong> channel. Site Directors and O5 can view
+      any role's channel.
+    </p>
+    <form method="get" class="add-form">
+      <div class="form-grid">
+        <label>
+          Channel
+          <select name="role" onchange="this.form.submit()">
+            {% for r in all_roles %}
+              <option value="{{ r }}" {% if r == selected_role %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </form>
+  {% else %}
+    <p class="page-subtitle">Internal channel for {{ viewer_role or 'your role' }} personnel only.</p>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% elif not selected_role %}
+    <div class="alert">No role is on file for your account - contact your supervisor to get added to a channel.</div>
+  {% else %}
+    <section class="table-wrap">
+      <table>
+        <tbody>
+          {% for m in messages %}
+            <tr>
+              <th>{{ m.get('From', '') }}<br>{{ m.get('Timestamp', '') }}</th>
+              <td>{{ m.get('Message', '') }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="2" class="empty-row">No messages yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="add-form">
+      <h2>Post a Message</h2>
+      <form method="post">
+        {% if privileged %}<input type="hidden" name="role" value="{{ selected_role }}">{% endif %}
+        <div class="form-grid">
+          <label>
+            Message
+            <textarea name="Message" rows="3" required></textarea>
+          </label>
+        </div>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

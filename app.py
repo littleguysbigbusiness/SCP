@@ -75,6 +75,7 @@ def login():
                 session.clear()
                 session["staff_name"] = staff_row.get("Name")
                 session["staff_id"] = staff_row.get("ID")
+                session["staff_role"] = (staff_row.get("Role") or "").strip()
                 session["privileged"] = auth.is_privileged(staff_row)
                 return redirect(url_for("dashboard" if session["privileged"] else "staff_duties"))
     return render_template("login.html", error=error)
@@ -220,6 +221,65 @@ def staff_lookup():
 @app.route("/communications", methods=["GET", "POST"])
 def communications():
     return _list_view("communications", "Communications")
+
+
+@app.route("/comms", methods=["GET", "POST"])
+def role_comms():
+    viewer_role = session.get("staff_role", "")
+    privileged = session.get("privileged", False)
+
+    all_roles = []
+    if privileged:
+        try:
+            all_roles = sorted(
+                {(r.get("Role") or "").strip() for r in sc.get_rows("staff") if (r.get("Role") or "").strip()}
+            )
+        except Exception:
+            all_roles = []
+
+    selected_role = viewer_role
+    if privileged:
+        requested = request.values.get("role", "").strip()
+        if requested:
+            selected_role = requested
+        elif not selected_role and all_roles:
+            selected_role = all_roles[0]
+
+    if request.method == "POST":
+        post_role = selected_role if privileged else viewer_role
+        message = request.form.get("Message", "").strip()
+        if post_role and message:
+            sc.add_row(
+                "role_comms",
+                {
+                    "ID": "",
+                    "Timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "Role": post_role,
+                    "From": session.get("staff_name", ""),
+                    "Message": message,
+                },
+            )
+        return redirect(url_for("role_comms", role=post_role) if privileged else url_for("role_comms"))
+
+    error = None
+    messages = []
+    if selected_role:
+        try:
+            rows = sc.get_rows("role_comms")
+            messages = [r for r in rows if (r.get("Role") or "").strip().lower() == selected_role.lower()]
+            messages.reverse()
+        except Exception as exc:
+            error = str(exc)
+
+    return render_template(
+        "role_comms.html",
+        messages=messages,
+        error=error,
+        viewer_role=viewer_role,
+        selected_role=selected_role,
+        all_roles=all_roles,
+        privileged=privileged,
+    )
 
 
 @app.route("/print")

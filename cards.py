@@ -323,7 +323,8 @@ def _draw_id_card(c, x, y, staff):
 
     c.setFont("Helvetica", 6.5)
     c.setFillColor(colors.HexColor("#8b9096"))
-    c.drawRightString(x + CARD_WIDTH - pad, content_top, "AREA: {}".format(_assign_area(staff.get("ID", ""))))
+    area = staff.get("Area") or _assign_area(staff.get("ID", ""))
+    c.drawRightString(x + CARD_WIDTH - pad, content_top, "AREA: {}".format(area))
 
     photo_w = photo_h = 0.85 * inch
     photo_x = x + CARD_WIDTH - pad - photo_w
@@ -389,7 +390,7 @@ def _draw_envelope_tag(c, x, y):
     c.setFont("Helvetica-Bold", 7)
     c.drawCentredString(x + TAG_WIDTH / 2, y + TAG_HEIGHT - header_h + 0.06 * inch, "SCP FOUNDATION")
 
-    fields = ["To", "From", "Address", "Notes"]
+    fields = ["To", "From", "Mail Back To", "Address", "Notes"]
     content_h = TAG_HEIGHT - header_h - pad
     line_h = content_h / len(fields)
     content_top = y + TAG_HEIGHT - header_h - 0.03 * inch

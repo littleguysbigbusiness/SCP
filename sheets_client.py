@@ -42,11 +42,16 @@ TABS = {
             "Born",
             "Role Rank",
             "Photo URL",
+            "Area",
         ],
     },
     "communications": {
         "title": "Communications",
         "headers": ["ID", "Timestamp", "From", "To", "Subject", "Message", "Priority"],
+    },
+    "role_comms": {
+        "title": "Role Comms",
+        "headers": ["ID", "Timestamp", "Role", "From", "Message"],
     },
 }
 
