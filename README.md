@@ -1,11 +1,13 @@
 # SCP Foundation Dashboard
 
-A small Flask dashboard with three tiles — **Archives**, **Staff**, and **Communications** —
-backed by a Google Sheet acting as the database. Deployed on Render as a web service.
+A small Flask dashboard with five tiles — **Archives**, **Staff**, **Communications**,
+**Class-D Records**, and **Test Logs** — backed by a Google Sheet acting as the database.
+Deployed on Render as a web service.
 
 ## How it works
 
-- Each tile corresponds to a tab in the Google Sheet (`Archives`, `Staff`, `Communications`).
+- Each tile corresponds to a tab in the Google Sheet (`Archives`, `Staff`, `Communications`,
+  `Class-D Records`, `Test Logs`).
 - The app reads/writes rows via the Google Sheets API using a service account.
 - If a tab doesn't exist yet, the app creates it automatically with the right headers
   the first time it's accessed.
@@ -24,7 +26,8 @@ Who gets what after logging in is decided by `auth.is_privileged()`, which check
 matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" or "site
 director" (case-insensitive substring match):
 
-- **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Print.
+- **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Class-D
+  Records, Test Logs, Print, Edit History.
 - **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
   page. Any other URL redirects there.
 
@@ -182,11 +185,23 @@ in and posts.
   entry: `ID`, `Timestamp`, `Role`, `From`, `Message`) — separate from the general
   `Communications` incident log, which stays privileged-only.
 
+## Class-D Records + Test Logs
+
+Two more privileged-only tiles, built on the same generic `_list_view`/`list.html` machinery
+as Archives/Staff/Communications — no new templates needed.
+
+- **Class-D Records** (`/class-d`) — `ID` (the D-Class designation, e.g. `D-9341`; there's
+  deliberately no separate Name field, matching how the Foundation tracks D-Class), `Status`,
+  `Assigned SCP`, `Intake Date`, `Termination Date`, `Notes`.
+- **Test Logs** (`/test-logs`) — `ID`, `Date` (auto-fills to today if left blank, same as
+  Archives' `Date Added`), `SCP`, `Subject`, `Procedure`, `Result`, `Researcher`.
+
 ## Editing records + Edit History
 
-Archives, Staff, and Communications rows can now be edited, not just added. Each row in
-those tables has an **Edit** link (`/archives/edit/<id>`, `/staff/edit/<id>`,
-`/communications/edit/<id>`) that opens a pre-filled form; saving it overwrites that row in
+Archives, Staff, Communications, Class-D Records, and Test Logs rows can all be edited, not
+just added. Each row in those tables has an **Edit** link (`/archives/edit/<id>`,
+`/staff/edit/<id>`, `/communications/edit/<id>`, `/class-d/edit/<id>`,
+`/test-logs/edit/<id>`) that opens a pre-filled form; saving it overwrites that row in
 the Sheet in place via `sheets_client.update_row()`, which finds the row by matching the
 `ID` column. Privileged-only, same as the tables themselves.
 

@@ -96,6 +96,8 @@ TILES = [
     {"key": "archives", "title": "Archives", "description": "SCP object records and containment data."},
     {"key": "staff", "title": "Staff", "description": "Personnel roster and clearance levels."},
     {"key": "communications", "title": "Communications", "description": "Internal message and incident log."},
+    {"key": "class_d", "title": "Class-D Records", "description": "D-Class personnel roster and assignments."},
+    {"key": "test_logs", "title": "Test Logs", "description": "SCP testing and experiment log."},
 ]
 
 PRINT_TILES = [
@@ -138,6 +140,8 @@ def _list_view(key, title):
         row = {h: request.form.get(h, "").strip() for h in config["headers"]}
         if key == "communications" and not row.get("Timestamp"):
             row["Timestamp"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if key == "test_logs" and not row.get("Date"):
+            row["Date"] = datetime.now(timezone.utc).date().isoformat()
         sc.add_row(key, row)
         return redirect(url_for(key))
 
@@ -283,6 +287,26 @@ def communications():
 @app.route("/communications/edit/<record_id>", methods=["GET", "POST"])
 def communications_edit(record_id):
     return _edit_view("communications", "Edit Communications Record", record_id)
+
+
+@app.route("/class-d", methods=["GET", "POST"])
+def class_d():
+    return _list_view("class_d", "Class-D Records")
+
+
+@app.route("/class-d/edit/<record_id>", methods=["GET", "POST"])
+def class_d_edit(record_id):
+    return _edit_view("class_d", "Edit Class-D Record", record_id)
+
+
+@app.route("/test-logs", methods=["GET", "POST"])
+def test_logs():
+    return _list_view("test_logs", "Test Logs")
+
+
+@app.route("/test-logs/edit/<record_id>", methods=["GET", "POST"])
+def test_logs_edit(record_id):
+    return _edit_view("test_logs", "Edit Test Log", record_id)
 
 
 @app.route("/history")

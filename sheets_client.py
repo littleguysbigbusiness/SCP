@@ -49,6 +49,14 @@ TABS = {
         "title": "Communications",
         "headers": ["ID", "Timestamp", "From", "To", "Subject", "Message", "Priority"],
     },
+    "class_d": {
+        "title": "Class-D Records",
+        "headers": ["ID", "Status", "Assigned SCP", "Intake Date", "Termination Date", "Notes"],
+    },
+    "test_logs": {
+        "title": "Test Logs",
+        "headers": ["ID", "Date", "SCP", "Subject", "Procedure", "Result", "Researcher"],
+    },
     "role_comms": {
         "title": "Role Comms",
         "headers": ["ID", "Timestamp", "Role", "From", "Message"],
