@@ -66,15 +66,24 @@ service account:
 If this isn't set up, `/archives/scan` still works for everything except the file upload —
 it shows an error and leaves the Archives entry unsaved rather than saving a broken link.
 
-### Also required for AI document reading
+### Also required for document reading (OCR)
 
-The "Read with AI" button on the Scan Document page needs an Anthropic API key:
+The "Read with OCR" button on the Scan Document page runs text recognition locally via
+Tesseract — no external API or account needed. It works best on documents formatted like
+a Foundation article (`Item #:`, `Object Class:`, `Special Containment Procedures:`,
+`Description:` labels), since those labels are what it uses to fill in the fields.
 
-1. Get a key from the [Anthropic Console](https://console.anthropic.com/).
-2. Set it as the `ANTHROPIC_API_KEY` environment variable (see below).
+- **On Render**: `render.yaml`'s `buildCommand` already installs the `tesseract-ocr` and
+  `poppler-utils` system packages, so no setup is needed.
+- **Running locally**: install Tesseract OCR yourself and make sure it's on your `PATH`.
+  - Windows: install the [UB Mannheim Tesseract build](https://github.com/UB-Mannheim/tesseract/wiki).
+  - macOS: `brew install tesseract poppler`
+  - Linux: `apt install tesseract-ocr poppler-utils`
 
-Without it, the upload/save flow still works — the AI button just shows an error instead
-of filling in the fields, and you fall back to typing them in by hand.
+  `poppler` is only needed for PDF uploads (it renders PDF pages to images before OCR).
+
+Without Tesseract installed, the upload/save flow still works — the OCR button just shows
+an error instead of filling in the fields, and you fall back to typing them in by hand.
 
 ## Environment variables
 
@@ -83,8 +92,6 @@ of filling in the fields, and you fall back to typing them in by hand.
 | `GOOGLE_SHEET_ID` | The ID from the sheet URL: `docs.google.com/spreadsheets/d/<THIS_PART>/edit` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | The full JSON key file contents, as a single-line string |
 | `GOOGLE_DRIVE_FOLDER_ID` | ID of a Drive folder shared with the service account (Editor), for Archives → Scan Document uploads |
-| `ANTHROPIC_API_KEY` | API key for Claude, used to read scanned documents on Archives → Scan Document |
-| `ANTHROPIC_MODEL` | Model used for document reading. Defaults to `claude-opus-4-8`; set to a cheaper/faster model (e.g. `claude-haiku-4-5`) if you want to trade accuracy for cost |
 | `SECRET_KEY` | Any random string, used for Flask session signing |
 | `STAFF_LOGIN_PASSWORD` | Shared login password for all staff. Defaults to `123456` if unset — **change this on Render** since it's the one thing gating the whole site |
 
@@ -179,14 +186,16 @@ Uploads are capped at 10MB (`MAX_CONTENT_LENGTH`). If the Drive upload fails (e.
 folder isn't shared yet), the form re-shows with an error and nothing is saved — no entry
 with a dead link.
 
-**Read with AI** — pick a file, then click "Read with AI" (it also fires automatically on
-file selection). The browser sends the file to `/archives/scan/analyze`, which calls Claude
-(`ai_client.py`, vision input + structured JSON output) to read the document and fill in
-Designation / Object Class / Description / Containment Procedures. This is a separate,
-Drive-free request purely for reading the file — nothing is saved or uploaded until you
-review the filled-in fields and click **Save to Archives**, which does the actual Drive
-upload. Fields the model can't determine come back blank rather than guessed; it's
-instructed not to invent specifics not visible in the document.
+**Read with OCR** — pick a file, then click "Read with OCR" (it also fires automatically on
+file selection). The browser sends the file to `/archives/scan/analyze`, which runs local
+text recognition (`ocr_client.py`, Tesseract via `pytesseract`; PDFs are rendered to images
+first with `pdf2image`) and fills in Designation / Object Class / Description / Containment
+Procedures by matching the OCR'd text against those labels. This is a separate, Drive-free
+request purely for reading the file — nothing is saved or uploaded until you review the
+filled-in fields and click **Save to Archives**, which does the actual Drive upload. Fields
+it can't find a label for come back blank rather than guessed. It only recognizes documents
+formatted with the classic Foundation article labels — plain prose or a different layout
+won't map cleanly onto the fields.
 
 ## Project structure
 
@@ -195,7 +204,7 @@ app.py              Flask routes + login/access-control hook
 auth.py               Login matching + O5/Site Director privilege check
 sheets_client.py     Google Sheets read/write helpers
 drive_client.py       Google Drive upload helper (Archives scans)
-ai_client.py           Claude vision call that reads scanned documents
+ocr_client.py           Tesseract OCR that reads scanned documents
 cards.py             PDF generation (keycards, staff IDs, stickers)
 templates/           Jinja templates (dashboard, per-tile list/add views, print center,
                       staff lookup, archives scan, login, staff duties)

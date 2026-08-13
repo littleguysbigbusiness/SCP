@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
 
-import ai_client
 import auth
 import cards
 import drive_client
+import ocr_client
 import sheets_client as sc
 
 app = Flask(__name__)
@@ -160,7 +160,7 @@ def archives_scan_analyze():
     if not file or not file.filename:
         return jsonify({"error": "No file provided."}), 400
     try:
-        data = ai_client.extract_archive_fields(file.read(), file.mimetype)
+        data = ocr_client.extract_archive_fields(file.read(), file.mimetype)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
     return jsonify(data)

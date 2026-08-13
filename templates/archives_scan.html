@@ -2,7 +2,7 @@
 {% block title %}Scan Document // Archives{% endblock %}
 {% block content %}
   <h1 class="page-title">Scan Document</h1>
-  <p class="page-subtitle">Upload a photo or PDF of a document. AI reads it and fills in the fields below - review before saving.</p>
+  <p class="page-subtitle">Upload a photo or PDF of a document. OCR reads it and fills in the fields below - review before saving.</p>
 
   {% if error %}
     <div class="alert">{{ error }}</div>
@@ -18,8 +18,8 @@
       </div>
 
       <div class="scan-controls">
-        <button type="button" id="ai-read-btn">Read with AI</button>
-        <div id="ai-status" class="scan-status"></div>
+        <button type="button" id="ocr-read-btn">Read with OCR</button>
+        <div id="ocr-status" class="scan-status"></div>
       </div>
 
       <div class="form-grid">
@@ -41,8 +41,8 @@
   <script>
     (function () {
       var fileInput = document.getElementById('document-input');
-      var btn = document.getElementById('ai-read-btn');
-      var status = document.getElementById('ai-status');
+      var btn = document.getElementById('ocr-read-btn');
+      var status = document.getElementById('ocr-status');
 
       var FIELD_MAP = {
         'Designation': 'designation',
@@ -51,13 +51,13 @@
         'Containment Procedures': 'containment_procedures'
       };
 
-      function readWithAI() {
+      function readWithOCR() {
         var file = fileInput.files[0];
         if (!file) {
           status.textContent = 'Choose a file first.';
           return;
         }
-        status.textContent = 'Reading document with AI...';
+        status.textContent = 'Reading document with OCR...';
         var data = new FormData();
         data.append('document', file);
 
@@ -84,8 +84,8 @@
           });
       }
 
-      btn.addEventListener('click', readWithAI);
-      fileInput.addEventListener('change', readWithAI);
+      btn.addEventListener('click', readWithOCR);
+      fileInput.addEventListener('change', readWithOCR);
     })();
   </script>
 {% endblock %}

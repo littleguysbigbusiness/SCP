@@ -3,7 +3,7 @@ services:
     name: scp-dashboard
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: apt-get update && apt-get install -y tesseract-ocr poppler-utils && pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: GOOGLE_SHEET_ID
@@ -11,8 +11,6 @@ services:
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
       - key: GOOGLE_DRIVE_FOLDER_ID
-        sync: false
-      - key: ANTHROPIC_API_KEY
         sync: false
       - key: SECRET_KEY
         generateValue: true
