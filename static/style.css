@@ -7,6 +7,23 @@
   --accent: #c9a13b;
   --accent-dim: #7a6428;
   --danger: #b04437;
+
+  /* Object-class / clearance-level palette - matches CLEARANCE_COLORS in
+     cards.py so printed keycards and on-screen tags read the same. */
+  --tag-safe: #3f7d43;
+  --tag-safe-text: #8fd99f;
+  --tag-euclid: var(--accent);
+  --tag-euclid-text: var(--accent);
+  --tag-keter: var(--danger);
+  --tag-keter-text: #e0a89f;
+  --tag-thaumiel: #5a4a7a;
+  --tag-thaumiel-text: #b8a4dd;
+  --tag-blue: #2f6fa8;
+  --tag-blue-text: #7fb4e0;
+  --tag-neutral: #5b6167;
+  --tag-neutral-text: #a9adb2;
+  --tag-o5: #e8c34a;
+  --tag-o5-text: #f2dc8a;
 }
 
 * { box-sizing: border-box; }
@@ -21,6 +38,43 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  animation: crt-flicker 7s infinite;
+}
+
+/* Vignette + moving scanline sweep, layered over the whole viewport like a
+   CRT monitor. Fixed and pointer-events:none so they never block clicks. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  pointer-events: none;
+  opacity: 0.5;
+  background: linear-gradient(rgba(255, 255, 255, 0.05) 50%, transparent 50%);
+  background-size: 100% 4px;
+  animation: scan-sweep 10s linear infinite;
+}
+
+@keyframes scan-sweep {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100vh; }
+}
+
+@keyframes crt-flicker {
+  0%, 91%, 100% { opacity: 1; }
+  92% { opacity: 0.95; }
+  93% { opacity: 1; }
+  95% { opacity: 0.97; }
+  96% { opacity: 1; }
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -45,7 +99,7 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 0.95rem;
 }
 
-.brand-mark { color: var(--accent); display: inline-flex; }
+.brand-mark { color: var(--accent); display: inline-flex; filter: drop-shadow(0 0 4px rgba(201, 161, 59, 0.5)); }
 .brand-mark svg { width: 1.3rem; height: 1.3rem; }
 
 .site-nav { display: flex; gap: 1.25rem; }
@@ -72,6 +126,19 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 1.6rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(201, 161, 59, 0.35);
+}
+
+.page-title::after {
+  content: "_";
+  display: inline-block;
+  margin-left: 0.3rem;
+  color: var(--accent);
+  animation: cursor-blink 1.1s steps(1) infinite;
+}
+
+@keyframes cursor-blink {
+  50% { opacity: 0; }
 }
 
 .page-subtitle { color: var(--text-dim); margin: 0 0 2rem; }
@@ -140,6 +207,28 @@ th {
 }
 
 td { color: var(--text); white-space: normal; }
+
+.tag {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.tag-safe { color: var(--tag-safe-text); border-color: var(--tag-safe); }
+.tag-euclid { color: var(--tag-euclid-text); border-color: var(--tag-euclid); }
+.tag-keter { color: var(--tag-keter-text); border-color: var(--tag-keter); }
+.tag-thaumiel { color: var(--tag-thaumiel-text); border-color: var(--tag-thaumiel); }
+.tag-blue { color: var(--tag-blue-text); border-color: var(--tag-blue); }
+.tag-neutral { color: var(--tag-neutral-text); border-color: var(--tag-neutral); }
+.tag-o5 {
+  color: var(--tag-o5-text);
+  border-color: var(--tag-o5);
+  text-shadow: 0 0 5px rgba(232, 195, 74, 0.6);
+}
 
 .empty-row { color: var(--text-dim); text-align: center; white-space: normal; }
 
@@ -216,6 +305,38 @@ button:hover { background: var(--accent); color: var(--bg); }
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   border-top: 1px solid var(--border);
+}
+
+.hazard-bar {
+  background: repeating-linear-gradient(
+    135deg,
+    #0d0e10,
+    #0d0e10 14px,
+    var(--accent-dim) 14px,
+    var(--accent-dim) 28px
+  );
+  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 1rem;
+  text-align: center;
+}
+
+.hazard-bar span {
+  display: inline-block;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.75rem;
+}
+
+.redacted {
+  background: var(--text);
+  color: var(--text);
+  border-radius: 1px;
+  user-select: none;
+  cursor: default;
 }
 
 .login-wrap {

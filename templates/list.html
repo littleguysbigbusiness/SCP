@@ -29,6 +29,10 @@
               <td>
                 {% if h == 'Scan URL' and row[h] %}
                   <a href="{{ row[h] }}" target="_blank" rel="noopener">View scan</a>
+                {% elif h == 'Object Class' and row[h] %}
+                  <span class="tag tag-{{ row[h]|class_tag }}">{{ row[h] }}</span>
+                {% elif h == 'Clearance Level' and row[h] %}
+                  <span class="tag tag-{{ row[h]|clearance_tag }}">{{ row[h] }}</span>
                 {% else %}
                   {{ row[h] }}
                 {% endif %}

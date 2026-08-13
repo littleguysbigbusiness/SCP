@@ -2,7 +2,7 @@
 {% block title %}Staff Duties // SCP Foundation{% endblock %}
 {% block content %}
   <h1 class="page-title">Staff Duties</h1>
-  <p class="page-subtitle">Welcome, {{ session.get('staff_name', 'Staff') }}. Standard duty guidelines are listed below.</p>
+  <p class="page-subtitle">MEMORANDUM // ALL PERSONNEL &mdash; Welcome, {{ session.get('staff_name', 'Staff') }}. Standard duty guidelines are listed below.</p>
 
   <section class="table-wrap">
     <table>
@@ -17,4 +17,13 @@
   </section>
 
   <p class="page-subtitle">Higher-clearance systems (Archives, Staff, Print, Communications) are restricted to O5 Council and Site Directors.</p>
+
+  <section class="add-form">
+    <h2>Addendum</h2>
+    <p class="page-subtitle">
+      Personnel are reminded that <span class="redacted">events of the ██/██/████ incident</span> remain
+      under a standing gag order. Inquiries should be directed to your site supervisor, not discussed
+      over unsecured channels.
+    </p>
+  </section>
 {% endblock %}

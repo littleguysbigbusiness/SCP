@@ -13,6 +13,36 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
+OBJECT_CLASS_TAGS = {
+    "safe": "safe",
+    "euclid": "euclid",
+    "keter": "keter",
+    "thaumiel": "thaumiel",
+    "apollyon": "keter",
+    "neutralized": "neutral",
+    "explained": "neutral",
+}
+
+# Same families as cards.py's CLEARANCE_COLORS/KEYCARD_LEVEL_COLORS, so a
+# staff member's clearance tag on-screen matches their printed keycard.
+CLEARANCE_LEVEL_TAGS = {"0": "neutral", "1": "safe", "2": "blue", "3": "euclid", "4": "keter", "5": "thaumiel"}
+
+
+@app.template_filter("class_tag")
+def class_tag(value):
+    return OBJECT_CLASS_TAGS.get((value or "").strip().lower(), "neutral")
+
+
+@app.template_filter("clearance_tag")
+def clearance_tag(value):
+    text = str(value or "")
+    if "o5" in text.lower():
+        return "o5"
+    for char in text:
+        if char.isdigit():
+            return CLEARANCE_LEVEL_TAGS.get(char, "neutral")
+    return "neutral"
+
 
 @app.before_request
 def _require_login():
