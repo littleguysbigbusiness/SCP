@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Site Status // SCP Foundation{% endblock %}
+{% block content %}
+  {% if privileged and known_sites %}
+    <form method="get" class="add-form">
+      <div class="form-grid">
+        <label>
+          Site
+          <select name="site" onchange="this.form.submit()">
+            {% for s in known_sites %}
+              <option value="{{ s }}" {% if s == selected_site %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </form>
+  {% endif %}
+
+  {% if not state %}
+    <div class="alert">No site is on file for your account - contact your supervisor to get assigned to one.</div>
+  {% else %}
+    <div
+      class="alarm-status-screen alarm-level-{{ state.level }} alarm-tier-{{ state.tier }}"
+      id="alarm-screen"
+      data-site="{{ selected_site }}"
+    >
+      <div class="alarm-status-site">SITE {{ selected_site }}</div>
+      <div class="alarm-status-label" id="alarm-label">LEVEL {{ state.level }}: {{ state.label }}</div>
+      <div class="alarm-status-desc" id="alarm-desc">{{ state.description }}</div>
+      <div class="alarm-status-message" id="alarm-message" {% if not state.message %}style="display:none;"{% endif %}>
+        {{ state.message }}
+      </div>
+      <div class="alarm-status-message" id="announcement-message" {% if not announcement %}style="display:none;"{% endif %}>
+        {% if announcement %}Announcement from {{ announcement.author }}: {{ announcement.message }}{% endif %}
+      </div>
+      <div class="alarm-status-controls">
+        <button type="button" id="fullscreen-btn">Fullscreen</button>
+        <button type="button" id="speak-btn">Repeat Announcement</button>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var screenEl = document.getElementById('alarm-screen');
+        var site = screenEl.dataset.site;
+        var labelEl = document.getElementById('alarm-label');
+        var descEl = document.getElementById('alarm-desc');
+        var messageEl = document.getElementById('alarm-message');
+        var announcementEl = document.getElementById('announcement-message');
+        var fullscreenBtn = document.getElementById('fullscreen-btn');
+        var speakBtn = document.getElementById('speak-btn');
+
+        var current = {
+          level: {{ state.level }},
+          label: {{ state.label|tojson }},
+          description: {{ state.description|tojson }},
+          message: {{ state.message|tojson }},
+          tier: {{ state.tier|tojson }},
+          announcement: {{ announcement|tojson }}
+        };
+
+        function speak(text) {
+          if (!('speechSynthesis' in window)) return;
+          window.speechSynthesis.cancel();
+          var utter = new SpeechSynthesisUtterance(text);
+          utter.rate = 0.95;
+          window.speechSynthesis.speak(utter);
+        }
+
+        function announceAlarm(data) {
+          var text = 'Attention. Site ' + site + ' alert level ' + data.level + ': ' + data.label + '. ' + data.description;
+          if (data.message) { text += ' ' + data.message; }
+          speak(text);
+        }
+
+        function announceMessage(a) {
+          if (!a) return;
+          speak('Announcement from ' + a.author + '. ' + a.message);
+        }
+
+        function applyState(data) {
+          labelEl.textContent = 'LEVEL ' + data.level + ': ' + data.label;
+          descEl.textContent = data.description;
+          if (data.message) {
+            messageEl.textContent = data.message;
+            messageEl.style.display = '';
+          } else {
+            messageEl.style.display = 'none';
+          }
+          screenEl.className = 'alarm-status-screen alarm-level-' + data.level + ' alarm-tier-' + data.tier;
+        }
+
+        function applyAnnouncement(a) {
+          if (a) {
+            announcementEl.textContent = 'Announcement from ' + a.author + ': ' + a.message;
+            announcementEl.style.display = '';
+          } else {
+            announcementEl.style.display = 'none';
+          }
+        }
+
+        fullscreenBtn.addEventListener('click', function () {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            screenEl.requestFullscreen();
+          }
+        });
+
+        speakBtn.addEventListener('click', function () {
+          announceAlarm(current);
+          announceMessage(current.announcement);
+        });
+
+        announceAlarm(current);
+        announceMessage(current.announcement);
+
+        setInterval(function () {
+          fetch('{{ url_for("site_status_data") }}?site=' + encodeURIComponent(site))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.error) return;
+
+              if (data.level !== current.level || data.message !== current.message) {
+                applyState(data);
+                announceAlarm(data);
+              }
+
+              var newAnnouncementId = data.announcement ? data.announcement.id : null;
+              var oldAnnouncementId = current.announcement ? current.announcement.id : null;
+              if (newAnnouncementId !== oldAnnouncementId) {
+                applyAnnouncement(data.announcement);
+                announceMessage(data.announcement);
+              }
+
+              current = data;
+            })
+            .catch(function () {});
+        }, 12000);
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

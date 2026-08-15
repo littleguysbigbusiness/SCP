@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
@@ -26,6 +27,113 @@ OBJECT_CLASS_TAGS = {
 # Same families as cards.py's CLEARANCE_COLORS/KEYCARD_LEVEL_COLORS, so a
 # staff member's clearance tag on-screen matches their printed keycard.
 CLEARANCE_LEVEL_TAGS = {"0": "neutral", "1": "safe", "2": "blue", "3": "euclid", "4": "keter", "5": "thaumiel"}
+
+# "tier" drives how urgently the Site Status screen animates (see .alarm-tier-*
+# in style.css) - it escalates independently of the numeric level so e.g.
+# levels 2-3 read as equally "elevated" even though only one number is higher.
+ALARM_LEVELS = {
+    1: {
+        "label": "Normal Protocol",
+        "tier": "calm",
+        "description": "Standard operations. No active threats. Continue routine duties.",
+    },
+    2: {
+        "label": "Minor SCP Breach",
+        "tier": "elevated",
+        "description": "A contained anomaly has breached containment. Non-essential personnel remain clear of the affected wing.",
+    },
+    3: {
+        "label": "CI Detected",
+        "tier": "elevated",
+        "description": "Chaos Insurgency activity detected on or near the site. Increase security posture and verify all credentials.",
+    },
+    4: {
+        "label": "Mass SCP Breach",
+        "tier": "severe",
+        "description": "Multiple containment breaches in progress. Non-essential personnel proceed to designated shelter points.",
+    },
+    5: {
+        "label": "Mass Dangerous SCP Breach",
+        "tier": "severe",
+        "description": "Multiple hazardous anomalies are loose. All personnel proceed to designated shelter points immediately.",
+    },
+    6: {
+        "label": "CI Raid",
+        "tier": "critical",
+        "description": "Chaos Insurgency forces are engaging site security. All non-security personnel shelter in place.",
+    },
+    7: {
+        "label": "Evacuation",
+        "tier": "critical",
+        "description": "Evacuate the facility immediately via the nearest marked exit. This is not a drill.",
+    },
+}
+
+
+def _known_sites():
+    sites = set()
+    for tab in ("staff", "site_alarms"):
+        try:
+            for r in sc.get_rows(tab):
+                s = (r.get("Site") or "").strip()
+                if s:
+                    sites.add(s)
+        except Exception:
+            pass
+    return sorted(sites)
+
+
+def _get_site_alarm(site):
+    if not site:
+        return None
+    try:
+        rows = sc.get_rows("site_alarms")
+    except Exception:
+        return None
+    return next((r for r in rows if str(r.get("Site", "")) == str(site)), None)
+
+
+def _site_alarm_state(site):
+    row = _get_site_alarm(site)
+    level = int(row["Level"]) if row and str(row.get("Level", "")).isdigit() else 1
+    level = level if level in ALARM_LEVELS else 1
+    info = ALARM_LEVELS[level]
+    return {
+        "site": site,
+        "level": level,
+        "label": info["label"],
+        "tier": info["tier"],
+        "description": info["description"],
+        "message": (row.get("Message") if row else "") or "",
+        "updated_by": (row.get("Updated By") if row else "") or "",
+        "updated_at": (row.get("Updated At") if row else "") or "",
+    }
+
+
+ANNOUNCEMENT_ALL_SITES = "All Sites"
+
+
+def _latest_announcement(site):
+    if not site:
+        return None
+    try:
+        rows = sc.get_rows("announcements")
+    except Exception:
+        return None
+    relevant = [r for r in rows if r.get("Site") in (site, ANNOUNCEMENT_ALL_SITES)]
+    return relevant[-1] if relevant else None
+
+
+def _announcement_payload(row):
+    if not row:
+        return None
+    return {
+        "id": row.get("ID", ""),
+        "message": row.get("Message", ""),
+        "author": row.get("Author", ""),
+        "timestamp": row.get("Timestamp", ""),
+        "site": row.get("Site", ""),
+    }
 
 
 @app.template_filter("class_tag")
@@ -76,6 +184,7 @@ def login():
                 session["staff_name"] = staff_row.get("Name")
                 session["staff_id"] = staff_row.get("ID")
                 session["staff_role"] = (staff_row.get("Role") or "").strip()
+                session["staff_site"] = (staff_row.get("Site") or "").strip()
                 session["privileged"] = auth.is_privileged(staff_row)
                 return redirect(url_for("dashboard" if session["privileged"] else "staff_duties"))
     return render_template("login.html", error=error)
@@ -318,6 +427,133 @@ def edit_history():
     except Exception as exc:
         error = str(exc)
     return render_template("history.html", rows=rows, error=error)
+
+
+@app.route("/alarms", methods=["GET", "POST"])
+def alarms():
+    if request.method == "POST":
+        site = request.form.get("Site", "").strip()
+        message = request.form.get("Message", "").strip()
+        try:
+            level = int(request.form.get("Level", "0"))
+        except ValueError:
+            level = 0
+
+        if site and level in ALARM_LEVELS:
+            timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            old_row = sc.set_site_alarm(site, level, message, session.get("staff_name", ""), timestamp)
+            old_level = str(old_row.get("Level", "")) if old_row else ""
+            old_message = old_row.get("Message", "") if old_row else ""
+            changes = []
+            if old_level != str(level):
+                old_label = ALARM_LEVELS.get(int(old_level), {}).get("label", "none") if old_level.isdigit() else "none"
+                changes.append('Level: "{}" -> "{}: {}"'.format(old_label, level, ALARM_LEVELS[level]["label"]))
+            if old_message != message:
+                changes.append('Message: "{}" -> "{}"'.format(old_message, message))
+            if changes:
+                sc.add_row(
+                    "edit_history",
+                    {
+                        "Timestamp": timestamp,
+                        "Tab": "Site Alarms",
+                        "Record ID": site,
+                        "Editor": session.get("staff_name", ""),
+                        "Changes": "; ".join(changes),
+                    },
+                )
+        return redirect(url_for("alarms"))
+
+    error = None
+    known_sites = []
+    try:
+        known_sites = _known_sites()
+    except Exception as exc:
+        error = str(exc)
+
+    statuses = [_site_alarm_state(site) for site in known_sites]
+
+    return render_template(
+        "alarms.html", statuses=statuses, levels=ALARM_LEVELS, known_sites=known_sites, error=error
+    )
+
+
+@app.route("/site-status")
+def site_status():
+    privileged = session.get("privileged", False)
+    viewer_site = session.get("staff_site", "")
+    known_sites = _known_sites()
+
+    if privileged:
+        selected_site = request.args.get("site", "").strip() or viewer_site or (known_sites[0] if known_sites else "")
+    else:
+        selected_site = viewer_site
+
+    state = _site_alarm_state(selected_site) if selected_site else None
+    announcement = _announcement_payload(_latest_announcement(selected_site)) if selected_site else None
+
+    return render_template(
+        "site_status.html",
+        state=state,
+        announcement=announcement,
+        selected_site=selected_site,
+        privileged=privileged,
+        known_sites=known_sites,
+    )
+
+
+@app.route("/site-status/data")
+def site_status_data():
+    privileged = session.get("privileged", False)
+    viewer_site = session.get("staff_site", "")
+    requested = request.args.get("site", "").strip()
+    selected_site = requested if (privileged and requested) else viewer_site
+
+    if not selected_site:
+        return jsonify({"error": "No site to report on."}), 404
+
+    data = _site_alarm_state(selected_site)
+    data["announcement"] = _announcement_payload(_latest_announcement(selected_site))
+    return jsonify(data)
+
+
+@app.route("/announcements", methods=["GET", "POST"])
+def announcements():
+    if request.method == "POST":
+        site = request.form.get("Site", "").strip() or ANNOUNCEMENT_ALL_SITES
+        message = request.form.get("Message", "").strip()
+        if message:
+            sc.add_row(
+                "announcements",
+                {
+                    # A real unique ID (unlike Role Comms, which leaves it
+                    # blank) because the Site Status poller diffs on it to
+                    # detect a new announcement - two posts in the same
+                    # second would otherwise look identical.
+                    "ID": uuid.uuid4().hex[:12],
+                    "Timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "Site": site,
+                    "Message": message,
+                    "Author": session.get("staff_name", ""),
+                },
+            )
+        return redirect(url_for("announcements"))
+
+    error = None
+    rows = []
+    known_sites = []
+    try:
+        rows = list(reversed(sc.get_rows("announcements")))
+        known_sites = _known_sites()
+    except Exception as exc:
+        error = str(exc)
+
+    return render_template(
+        "announcements.html",
+        rows=rows,
+        known_sites=known_sites,
+        error=error,
+        all_sites_label=ANNOUNCEMENT_ALL_SITES,
+    )
 
 
 @app.route("/comms", methods=["GET", "POST"])

@@ -65,6 +65,14 @@ TABS = {
         "title": "Edit History",
         "headers": ["Timestamp", "Tab", "Record ID", "Editor", "Changes"],
     },
+    "site_alarms": {
+        "title": "Site Alarms",
+        "headers": ["Site", "Level", "Message", "Updated By", "Updated At"],
+    },
+    "announcements": {
+        "title": "Announcements",
+        "headers": ["ID", "Timestamp", "Site", "Message", "Author"],
+    },
 }
 
 _credentials = None
@@ -178,4 +186,34 @@ def update_row(key, record_id, new_values):
             ws.update(range_name="{}:{}".format(start, end), values=[values])
             _rows_cache.pop(key, None)
             return record
+    return None
+
+
+def set_site_alarm(site, level, message, updated_by, updated_at):
+    """Upserts the current alarm row for a site, keyed on the Site column.
+
+    Returns the site's prior alarm row (a dict), or None if the site had no
+    alarm row yet.
+    """
+    headers = TABS["site_alarms"]["headers"]
+    new_values = {
+        "Site": site,
+        "Level": level,
+        "Message": message,
+        "Updated By": updated_by,
+        "Updated At": updated_at,
+    }
+    ws = get_worksheet("site_alarms")
+    records = ws.get_all_records()
+    for i, record in enumerate(records):
+        if str(record.get("Site", "")) == str(site):
+            row_index = i + 2
+            values = [new_values.get(h, "") for h in headers]
+            start = gspread.utils.rowcol_to_a1(row_index, 1)
+            end = gspread.utils.rowcol_to_a1(row_index, len(headers))
+            ws.update(range_name="{}:{}".format(start, end), values=[values])
+            _rows_cache.pop("site_alarms", None)
+            return record
+    ws.append_row([new_values.get(h, "") for h in headers])
+    _rows_cache.pop("site_alarms", None)
     return None

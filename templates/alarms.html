@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Site Alarms // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Site Alarm Control</h1>
+  <p class="page-subtitle">
+    Set a site's security alert level. Changes broadcast to that site's Site Status screen
+    and are logged to Edit History.
+  </p>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% endif %}
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Current Level</th>
+          <th>Message</th>
+          <th>Updated By</th>
+          <th>Updated At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in statuses %}
+          <tr>
+            <td>{{ s.site }}</td>
+            <td><span class="alarm-chip alarm-level-{{ s.level }}">Level {{ s.level }}: {{ s.label }}</span></td>
+            <td>{{ s.message }}</td>
+            <td>{{ s.updated_by }}</td>
+            <td>{{ s.updated_at }}</td>
+            <td><a href="{{ url_for('site_status', site=s.site) }}" target="_blank" rel="noopener">Preview</a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="empty-row">No sites on file yet - add one below.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="add-form">
+    <h2>Set Alert Level</h2>
+    <form method="post" id="alarm-form">
+      <div class="form-grid">
+        <label>
+          Site
+          <input type="text" name="Site" list="known-sites" placeholder="e.g. Site-19" required>
+          <datalist id="known-sites">
+            {% for s in known_sites %}<option value="{{ s }}">{% endfor %}
+          </datalist>
+        </label>
+        <label>
+          Message (optional)
+          <input type="text" name="Message" placeholder="Broadcast message shown with the alert">
+        </label>
+      </div>
+
+      <input type="hidden" name="Level" id="level-input" value="1">
+
+      <div class="alarm-level-picker">
+        {% for lvl, info in levels.items() %}
+          <button
+            type="button"
+            class="alarm-level-btn alarm-level-{{ lvl }}{% if lvl == 1 %} selected{% endif %}"
+            data-level="{{ lvl }}"
+            data-label="{{ info.label }}"
+            data-desc="{{ info.description }}"
+          >Level {{ lvl }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="alarm-preview" id="alarm-preview">
+        <strong>Level 1: {{ levels[1].label }}</strong>
+        <p>{{ levels[1].description }}</p>
+      </div>
+
+      <button type="submit">Set Alert Level</button>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      var buttons = document.querySelectorAll('.alarm-level-btn');
+      var levelInput = document.getElementById('level-input');
+      var preview = document.getElementById('alarm-preview');
+
+      function selectLevel(btn) {
+        buttons.forEach(function (b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+        levelInput.value = btn.dataset.level;
+        preview.innerHTML =
+          '<strong>Level ' + btn.dataset.level + ': ' + btn.dataset.label + '</strong>' +
+          '<p>' + btn.dataset.desc + '</p>';
+      }
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () { selectLevel(btn); });
+      });
+    })();
+  </script>
+{% endblock %}

@@ -210,6 +210,56 @@ Every save that actually changes something logs a row to a new `Edit History` Sh
 just the fields that changed, e.g. `Area: "" -> "Area 12"`. View it at `/history` (linked
 as "History" in the nav for privileged users), newest first.
 
+## Site Alarms
+
+A per-site security alert level system, same dynamic-per-value approach as Role Comms:
+whatever text is in a staff member's `Site` column becomes a site with its own alarm state
+— no fixed site list to configure. Current state per site lives in a `Site Alarms` Sheet
+tab (`sheets_client.set_site_alarm()` upserts by `Site`, so there's exactly one live row per
+site, not a growing log), and every level change is also logged to Edit History.
+
+Seven levels, escalating severity (`ALARM_LEVELS` in `app.py`):
+
+| Level | Label | Tier |
+|---|---|---|
+| 1 | Normal Protocol | calm |
+| 2 | Minor SCP Breach | elevated |
+| 3 | CI Detected | elevated |
+| 4 | Mass SCP Breach | severe |
+| 5 | Mass Dangerous SCP Breach | severe |
+| 6 | CI Raid | critical |
+| 7 | Evacuation | critical |
+
+- **`/alarms`** (privileged-only, linked as "Alarms") — control panel: an overview table of
+  every known site's current level, and a form to set a site's level (type/select the site,
+  click a color-coded level button, optional broadcast message, then "Set Alert Level").
+- **`/site-status`** (everyone, linked as "Site Status") — a fullscreen-friendly announcement
+  screen. Regular staff only ever see their own site (`session["staff_site"]`, set at login);
+  Site Directors and O5 get a site picker and can preview any site. The background color and
+  animation intensity scale with the tier (`calm` = static, `elevated` = slow pulse, `severe`
+  = fast pulse with glow, `critical` = hard flash). Uses the browser's built-in
+  `SpeechSynthesis` API to read the alert aloud on load and whenever it changes — no paid TTS
+  service involved. A "Fullscreen" button uses the Fullscreen API for wall-mounted displays.
+  The screen polls `/site-status/data` (JSON) every 12 seconds to pick up changes without a
+  full reload.
+
+## Announcements
+
+A separate, freeform broadcast channel from the alarm level itself — for messages that
+aren't tied to changing a site's security state. Lives in its own `Announcements` Sheet tab
+(`ID`, `Timestamp`, `Site`, `Message`, `Author`), an append-only log rather than the
+one-row-per-site upsert that Site Alarms uses.
+
+- **`/announcements`** (privileged-only, linked as "Announcements") — a form to broadcast a
+  message to one specific site, or to `"All Sites"` for a Foundation-wide message, plus a
+  history table of everything sent.
+- Shows up on the Site Status screen for any matching site (that exact site, or an "All
+  Sites" post) below the alarm panel, and gets read aloud via the same `SpeechSynthesis`
+  mechanism the moment it appears. Each announcement gets a real generated `ID`
+  (`uuid.uuid4().hex[:12]`, unlike Role Comms/Test Logs which leave `ID` blank) because the
+  Site Status poller diffs on it to detect a genuinely new announcement — using `Timestamp`
+  for that would fail if two announcements land in the same second.
+
 ## Staff Lookup
 
 `/staff/lookup` (linked from the Staff page) is a single ID input, auto-focused, that
