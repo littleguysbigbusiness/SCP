@@ -86,7 +86,10 @@ def _known_sites():
     sites = set()
     for tab in ("staff", "site_alarms"):
         for r in sc.get_rows(tab):
-            s = (r.get("Site") or "").strip()
+            # gspread casts numeric-looking cells (e.g. a Site typed as
+            # "19") to int/float instead of str, so .strip() alone would
+            # crash on those - str() first makes this safe either way.
+            s = str(r.get("Site") or "").strip()
             if s:
                 sites.add(s)
     return sorted(sites)
@@ -127,7 +130,7 @@ def _latest_announcement(site):
     if not site:
         return None
     rows = sc.get_rows("announcements")
-    relevant = [r for r in rows if r.get("Site") in (site, ANNOUNCEMENT_ALL_SITES)]
+    relevant = [r for r in rows if str(r.get("Site", "")) in (site, ANNOUNCEMENT_ALL_SITES)]
     return relevant[-1] if relevant else None
 
 
@@ -190,7 +193,7 @@ def login():
                 session.clear()
                 session["staff_name"] = staff_row.get("Name")
                 session["staff_id"] = staff_row.get("ID")
-                session["staff_role"] = (staff_row.get("Role") or "").strip()
+                session["staff_role"] = str(staff_row.get("Role") or "").strip()
                 session["privileged"] = auth.is_privileged(staff_row)
                 return redirect(url_for("dashboard" if session["privileged"] else "staff_duties"))
     return render_template("login.html", error=error)
@@ -449,7 +452,7 @@ def alarms():
             timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
             old_row = sc.set_site_alarm(site, level, message, session.get("staff_name", ""), timestamp)
             old_level = str(old_row.get("Level", "")) if old_row else ""
-            old_message = old_row.get("Message", "") if old_row else ""
+            old_message = str(old_row.get("Message", "")) if old_row else ""
             changes = []
             if old_level != str(level):
                 old_label = ALARM_LEVELS.get(int(old_level), {}).get("label", "none") if old_level.isdigit() else "none"
@@ -574,7 +577,7 @@ def role_comms():
     if privileged:
         try:
             all_roles = sorted(
-                {(r.get("Role") or "").strip() for r in sc.get_rows("staff") if (r.get("Role") or "").strip()}
+                {str(r.get("Role") or "").strip() for r in sc.get_rows("staff") if str(r.get("Role") or "").strip()}
             )
         except Exception:
             all_roles = []
@@ -608,7 +611,7 @@ def role_comms():
     if selected_role:
         try:
             rows = sc.get_rows("role_comms")
-            messages = [r for r in rows if (r.get("Role") or "").strip().lower() == selected_role.lower()]
+            messages = [r for r in rows if str(r.get("Role") or "").strip().lower() == selected_role.lower()]
             messages.reverse()
         except Exception as exc:
             error = str(exc)
