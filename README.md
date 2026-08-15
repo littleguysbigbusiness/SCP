@@ -27,7 +27,7 @@ matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" 
 director" (case-insensitive substring match):
 
 - **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Class-D
-  Records, Test Logs, Print, Edit History, Alarms, Announcements, Site Status.
+  Records, Test Logs, Print, Edit History, Alarms, Announcements, Warhead, Site Status.
 - **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
   page. Any other URL redirects there.
 
@@ -269,6 +269,31 @@ one-row-per-site upsert that Site Alarms uses.
   announcements land in the same second. The control-button row (Fullscreen/Repeat
   Announcement/Enable Alarm Audio) hides itself while the screen is in fullscreen, via the
   CSS `:fullscreen` pseudo-class, so a wall-mounted display shows just the alert.
+
+## Warhead
+
+A per-site self-destruct, absolute last resort, in its own `Warheads` Sheet tab (`Site`,
+`Status`, `Armed By`, `Armed At`, `Detonate At`) upserted the same way as Site Alarms - one
+live row per site (`sheets_client.set_warhead()`, sharing the `_upsert_by_column()` helper
+that `set_site_alarm()` also uses now).
+
+- **`/warhead`** (privileged-only, linked as "Warhead") — arming requires turning both "KEY
+  1" and "KEY 2" toggle buttons before the red "Arm Warhead" button becomes clickable (a
+  client-side gate for the classic two-key launch feel; the real security boundary is still
+  the privileged-only route). Arming a site forces its alarm to Level 7 Evacuation and starts
+  a 5-minute countdown (`WARHEAD_ARM_SECONDS`), all logged to Edit History. Any O5/Site
+  Director can Disarm an armed site before it reaches zero, or Reset a detonated one back to
+  Safe. Each row also has a "Broadcast to TV Screens" link that opens that site's Site Status
+  in a new tab.
+- There's no background job - whether the countdown has reached zero is computed lazily
+  whenever a site's warhead state is read (`_warhead_state()`), and the "detonated"
+  transition is written back to the sheet at that point so it sticks from then on.
+- Site Status reflects it live: while armed, a flashing countdown banner sits above the
+  normal alarm panel and a synthesized square-wave beep (Web Audio API `OscillatorNode`, no
+  audio file) ticks once per second, gated behind the same "Enable Alarm Audio" button as the
+  alarm-level sounds. On detonation, the whole screen swaps to a black "SITE DESTROYED" end
+  state, announced via `SpeechSynthesis`, picked up automatically by the existing 12-second
+  poll without needing a page reload.
 
 ## Staff Lookup
 

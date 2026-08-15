@@ -1,7 +1,7 @@
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
 
@@ -79,6 +79,8 @@ ALARM_LEVELS = {
     },
 }
 
+WARHEAD_ARM_SECONDS = 300
+
 
 def _known_sites():
     # Deliberately doesn't swallow errors here - a Sheets API failure must
@@ -121,6 +123,47 @@ def _site_alarm_state(site):
         "message": (row.get("Message") if row else "") or "",
         "updated_by": (row.get("Updated By") if row else "") or "",
         "updated_at": (row.get("Updated At") if row else "") or "",
+    }
+
+
+def _get_warhead(site):
+    if not site:
+        return None
+    rows = sc.get_rows("warheads")
+    return next((r for r in rows if str(r.get("Site", "")) == str(site)), None)
+
+
+def _warhead_state(site):
+    row = _get_warhead(site)
+    status = ((row.get("Status") if row else "") or "safe").strip().lower()
+    if status not in ("safe", "armed", "detonated"):
+        status = "safe"
+
+    detonate_at = (row.get("Detonate At") if row else "") or ""
+    seconds_left = None
+
+    if status == "armed" and detonate_at:
+        try:
+            target = datetime.fromisoformat(detonate_at)
+        except ValueError:
+            target = None
+        if target is not None:
+            seconds_left = int((target - datetime.now(timezone.utc)).total_seconds())
+            if seconds_left <= 0:
+                seconds_left = 0
+                status = "detonated"
+                # Lazily persist the transition the first time anyone reads
+                # it after the countdown elapses - there's no background job,
+                # so "has it detonated yet" is computed on read.
+                sc.set_warhead(site, "detonated", row.get("Armed By", ""), row.get("Armed At", ""), detonate_at)
+
+    return {
+        "site": site,
+        "status": status,
+        "armed_by": (row.get("Armed By") if row else "") or "",
+        "armed_at": (row.get("Armed At") if row else "") or "",
+        "detonate_at": detonate_at,
+        "seconds_left": seconds_left,
     }
 
 
@@ -515,6 +558,68 @@ def alarms():
     )
 
 
+def _log_change(tab, record_id, change_text):
+    sc.add_row(
+        "edit_history",
+        {
+            "Timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "Tab": tab,
+            "Record ID": record_id,
+            "Editor": session.get("staff_name", ""),
+            "Changes": change_text,
+        },
+    )
+
+
+@app.route("/warhead", methods=["GET", "POST"])
+def warhead():
+    if request.method == "POST":
+        site = request.form.get("Site", "").strip()
+        action = request.form.get("action", "")
+
+        if site and action == "arm":
+            timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            detonate_at = (datetime.now(timezone.utc) + timedelta(seconds=WARHEAD_ARM_SECONDS)).isoformat(
+                timespec="seconds"
+            )
+            sc.set_warhead(site, "armed", session.get("staff_name", ""), timestamp, detonate_at)
+            _log_change(
+                "Warhead",
+                site,
+                'Status: "safe" -> "armed" (detonates in {}:00)'.format(WARHEAD_ARM_SECONDS // 60),
+            )
+            # Arming is a last-resort action - force the site's alarm to
+            # Evacuation too, same as a real containment-breach protocol would.
+            alarm_row = sc.set_site_alarm(
+                site, 7, "Warhead armed - evacuate immediately", session.get("staff_name", ""), timestamp
+            )
+            if not alarm_row or str(alarm_row.get("Level", "")) != "7":
+                _log_change("Site Alarms", site, 'Level: -> "7: Evacuation" (warhead armed)')
+
+        elif site and action == "disarm":
+            sc.set_warhead(site, "safe", "", "", "")
+            _log_change("Warhead", site, 'Status: "armed" -> "safe" (disarmed)')
+
+        elif site and action == "reset":
+            sc.set_warhead(site, "safe", "", "", "")
+            _log_change("Warhead", site, 'Status: "detonated" -> "safe" (site reset)')
+
+        return redirect(url_for("warhead"))
+
+    error = None
+    known_sites = []
+    statuses = []
+    try:
+        known_sites = _known_sites()
+        statuses = [_warhead_state(site) for site in known_sites]
+    except Exception as exc:
+        error = str(exc)
+
+    return render_template(
+        "warhead.html", statuses=statuses, known_sites=known_sites, error=error, arm_seconds=WARHEAD_ARM_SECONDS
+    )
+
+
 @app.route("/site-status")
 def site_status():
     error = None
@@ -523,6 +628,7 @@ def site_status():
     state = None
     announcements = []
     alarm_history = []
+    warhead_state = None
     try:
         known_sites = _known_sites()
         selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
@@ -530,6 +636,7 @@ def site_status():
             state = _site_alarm_state(selected_site)
             announcements = _recent_announcements(selected_site)
             alarm_history = _alarm_history(selected_site)
+            warhead_state = _warhead_state(selected_site)
     except Exception as exc:
         error = str(exc)
 
@@ -538,6 +645,7 @@ def site_status():
         state=state,
         announcements=announcements,
         alarm_history=alarm_history,
+        warhead=warhead_state,
         selected_site=selected_site,
         known_sites=known_sites,
         error=error,
@@ -555,6 +663,7 @@ def site_status_data():
         data = _site_alarm_state(selected_site)
         data["announcements"] = _recent_announcements(selected_site)
         data["alarm_history"] = _alarm_history(selected_site)
+        data["warhead"] = _warhead_state(selected_site)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

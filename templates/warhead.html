@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Warhead // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Nuclear Warhead Control</h1>
+  <p class="page-subtitle">
+    Site self-destruct - absolute last resort. Arming forces that site's alert to Level 7
+    Evacuation and starts a {{ arm_seconds // 60 }}-minute countdown, broadcast live to its
+    Site Status screen. Every action is logged to Edit History.
+  </p>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% endif %}
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Status</th>
+          <th>Armed By</th>
+          <th>Detonates In</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in statuses %}
+          <tr>
+            <td>{{ s.site }}</td>
+            <td>
+              {% if s.status == 'armed' %}
+                <span class="alarm-chip alarm-level-6">ARMED</span>
+              {% elif s.status == 'detonated' %}
+                <span class="alarm-chip alarm-level-7">DETONATED</span>
+              {% else %}
+                <span class="alarm-chip alarm-level-1">SAFE</span>
+              {% endif %}
+            </td>
+            <td>{{ s.armed_by }}</td>
+            <td>
+              {% if s.status == 'armed' %}
+                <span class="warhead-countdown-cell" data-seconds="{{ s.seconds_left }}">--:--</span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="warhead-actions">
+              {% if s.status == 'armed' %}
+                <form method="post">
+                  <input type="hidden" name="Site" value="{{ s.site }}">
+                  <input type="hidden" name="action" value="disarm">
+                  <button type="submit">Disarm</button>
+                </form>
+              {% elif s.status == 'detonated' %}
+                <form method="post">
+                  <input type="hidden" name="Site" value="{{ s.site }}">
+                  <input type="hidden" name="action" value="reset">
+                  <button type="submit">Reset Site</button>
+                </form>
+              {% endif %}
+              <a href="{{ url_for('site_status', site=s.site) }}" target="_blank" rel="noopener">Broadcast to TV Screens</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty-row">No sites on file yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="add-form">
+    <h2>Arm Warhead</h2>
+    <div class="form-grid">
+      <label>
+        Site
+        <select id="arm-site-select">
+          {% for s in known_sites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="key-panel">
+      <button type="button" class="key-toggle" id="key1-btn">
+        <span class="key-icon">&#128273;</span> KEY 1
+      </button>
+      <button type="button" class="key-toggle" id="key2-btn">
+        <span class="key-icon">&#128273;</span> KEY 2
+      </button>
+    </div>
+
+    <form method="post" id="arm-form">
+      <input type="hidden" name="Site" id="arm-site-input">
+      <input type="hidden" name="action" value="arm">
+      <button type="submit" class="warhead-launch-btn" id="launch-btn" disabled>Arm Warhead</button>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      var key1 = document.getElementById('key1-btn');
+      var key2 = document.getElementById('key2-btn');
+      var launchBtn = document.getElementById('launch-btn');
+      var siteSelect = document.getElementById('arm-site-select');
+      var armForm = document.getElementById('arm-form');
+      var armSiteInput = document.getElementById('arm-site-input');
+      var key1On = false;
+      var key2On = false;
+
+      function updateLaunchState() {
+        launchBtn.disabled = !(key1On && key2On && siteSelect && siteSelect.value);
+      }
+
+      key1.addEventListener('click', function () {
+        key1On = !key1On;
+        key1.classList.toggle('turned', key1On);
+        updateLaunchState();
+      });
+      key2.addEventListener('click', function () {
+        key2On = !key2On;
+        key2.classList.toggle('turned', key2On);
+        updateLaunchState();
+      });
+      if (siteSelect) { siteSelect.addEventListener('change', updateLaunchState); }
+
+      armForm.addEventListener('submit', function () {
+        armSiteInput.value = siteSelect ? siteSelect.value : '';
+      });
+
+      updateLaunchState();
+
+      document.querySelectorAll('.warhead-countdown-cell[data-seconds]').forEach(function (cell) {
+        var s = parseInt(cell.dataset.seconds, 10);
+        if (isNaN(s)) { cell.textContent = '--:--'; return; }
+        (function tick() {
+          if (s <= 0) { cell.textContent = '00:00'; return; }
+          var m = Math.floor(s / 60), sec = s % 60;
+          cell.textContent = (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+          s -= 1;
+          setTimeout(tick, 1000);
+        })();
+      });
+    })();
+  </script>
+{% endblock %}

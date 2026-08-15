@@ -73,6 +73,10 @@ TABS = {
         "title": "Announcements",
         "headers": ["ID", "Timestamp", "Site", "Message", "Author"],
     },
+    "warheads": {
+        "title": "Warheads",
+        "headers": ["Site", "Status", "Armed By", "Armed At", "Detonate At"],
+    },
 }
 
 _credentials = None
@@ -168,6 +172,13 @@ def add_row(key, row_dict):
     _rows_cache.pop(key, None)
 
 
+def _write_row(ws, headers, row_index, values_dict):
+    values = [values_dict.get(h, "") for h in headers]
+    start = gspread.utils.rowcol_to_a1(row_index, 1)
+    end = gspread.utils.rowcol_to_a1(row_index, len(headers))
+    ws.update(range_name="{}:{}".format(start, end), values=[values])
+
+
 def update_row(key, record_id, new_values):
     """Overwrites the row whose ID matches record_id with new_values.
 
@@ -179,41 +190,44 @@ def update_row(key, record_id, new_values):
     records = ws.get_all_records()
     for i, record in enumerate(records):
         if str(record.get("ID", "")) == str(record_id):
-            row_index = i + 2  # +1 for the header row, +1 for 1-indexing
-            values = [new_values.get(h, "") for h in headers]
-            start = gspread.utils.rowcol_to_a1(row_index, 1)
-            end = gspread.utils.rowcol_to_a1(row_index, len(headers))
-            ws.update(range_name="{}:{}".format(start, end), values=[values])
+            _write_row(ws, headers, i + 2, new_values)  # +1 header row, +1 1-indexing
             _rows_cache.pop(key, None)
             return record
     return None
 
 
-def set_site_alarm(site, level, message, updated_by, updated_at):
-    """Upserts the current alarm row for a site, keyed on the Site column.
+def _upsert_by_column(key, column, value, new_values):
+    """Overwrites the row whose `column` matches `value` with new_values, or
+    appends a new row if none matched.
 
-    Returns the site's prior alarm row (a dict), or None if the site had no
-    alarm row yet.
+    Returns the row's prior values (a dict), or None if it was newly created.
     """
-    headers = TABS["site_alarms"]["headers"]
-    new_values = {
-        "Site": site,
-        "Level": level,
-        "Message": message,
-        "Updated By": updated_by,
-        "Updated At": updated_at,
-    }
-    ws = get_worksheet("site_alarms")
+    headers = TABS[key]["headers"]
+    ws = get_worksheet(key)
     records = ws.get_all_records()
     for i, record in enumerate(records):
-        if str(record.get("Site", "")) == str(site):
-            row_index = i + 2
-            values = [new_values.get(h, "") for h in headers]
-            start = gspread.utils.rowcol_to_a1(row_index, 1)
-            end = gspread.utils.rowcol_to_a1(row_index, len(headers))
-            ws.update(range_name="{}:{}".format(start, end), values=[values])
-            _rows_cache.pop("site_alarms", None)
+        if str(record.get(column, "")) == str(value):
+            _write_row(ws, headers, i + 2, new_values)
+            _rows_cache.pop(key, None)
             return record
     ws.append_row([new_values.get(h, "") for h in headers])
-    _rows_cache.pop("site_alarms", None)
+    _rows_cache.pop(key, None)
     return None
+
+
+def set_site_alarm(site, level, message, updated_by, updated_at):
+    return _upsert_by_column(
+        "site_alarms",
+        "Site",
+        site,
+        {"Site": site, "Level": level, "Message": message, "Updated By": updated_by, "Updated At": updated_at},
+    )
+
+
+def set_warhead(site, status, armed_by, armed_at, detonate_at):
+    return _upsert_by_column(
+        "warheads",
+        "Site",
+        site,
+        {"Site": site, "Status": status, "Armed By": armed_by, "Armed At": armed_at, "Detonate At": detonate_at},
+    )

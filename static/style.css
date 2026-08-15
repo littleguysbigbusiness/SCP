@@ -605,3 +605,116 @@ button:hover { background: var(--accent); color: var(--bg); }
 
 body:fullscreen .alarm-status-controls,
 #alarm-screen:fullscreen .alarm-status-controls { display: none; }
+
+/* Warhead control panel */
+
+.warhead-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.warhead-countdown-cell {
+  font-variant-numeric: tabular-nums;
+  color: var(--danger);
+  font-weight: bold;
+}
+
+.key-panel {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.key-toggle {
+  font-family: inherit;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: var(--text-dim);
+  padding: 1rem 1.75rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.key-toggle .key-icon {
+  font-size: 1.6rem;
+  transition: transform 0.3s;
+  display: inline-block;
+}
+
+.key-toggle.turned {
+  border-color: #3f7d43;
+  color: #8fd99f;
+  background: rgba(63, 125, 67, 0.15);
+}
+
+.key-toggle.turned .key-icon { transform: rotate(90deg); }
+
+.warhead-launch-btn {
+  font-family: inherit;
+  background: transparent;
+  border: 2px solid var(--danger);
+  color: var(--danger);
+  padding: 1rem 2.5rem;
+  font-size: 1.05rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.warhead-launch-btn:not(:disabled):hover { background: var(--danger); color: #fff; }
+
+.warhead-launch-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* Warhead state on the Site Status screen */
+
+.warhead-banner {
+  width: 100%;
+  max-width: 50rem;
+  background: #2a0a0a;
+  border: 2px solid var(--danger);
+  color: #ff8a7a;
+  padding: 0.8rem 1.5rem;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  animation: alarm-flash 0.8s steps(1) infinite;
+}
+
+.warhead-destroyed-screen {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: #0d0e10;
+  color: var(--danger);
+  text-align: center;
+  padding: 3rem 1.5rem;
+}
+
+.warhead-destroyed-screen .destroyed-label {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+
+.hidden { display: none !important; }
