@@ -452,8 +452,11 @@
               var newWarheadStatus = data.warhead ? data.warhead.status : 'safe';
               if (newWarheadStatus !== oldWarheadStatus) {
                 if (newWarheadStatus === 'detonated') {
+                  // Always announced, even if it was armed silently - the
+                  // detonation itself is real and can't be concealed once
+                  // it happens (the destroyed-screen shows regardless).
                   speak('Warning. Site ' + site + ' warhead has detonated. All containment lost.');
-                } else if (newWarheadStatus === 'armed') {
+                } else if (newWarheadStatus === 'armed' && data.warhead && data.warhead.show_countdown) {
                   speak('Warning. Site ' + site + ' warhead is armed. Evacuate immediately.');
                 }
               }
