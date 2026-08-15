@@ -3,9 +3,9 @@
 {% block content %}
   <h1 class="page-title">Screen Control</h1>
   <p class="page-subtitle">
-    Push an image or a countdown straight to a site's Site Status screen - independent of
-    Alarms/Announcements, no popup, no spoken "Announcement from" wrapper. A persistent
-    override until you clear it.
+    Push an image, a countdown, or custom audio straight to a site's Site Status screen -
+    independent of Alarms/Announcements, no popup, no spoken "Announcement from" wrapper. A
+    persistent override until you clear it.
   </p>
 
   {% if error %}
@@ -19,6 +19,7 @@
           <th>Site</th>
           <th>Image</th>
           <th>Countdown</th>
+          <th>Audio</th>
           <th>Set By</th>
           <th>Actions</th>
         </tr>
@@ -32,6 +33,13 @@
               {% if s.countdown_seconds is not none %}
                 {{ s.countdown_label or 'Countdown' }}
                 (<span class="warhead-countdown-cell" data-seconds="{{ s.seconds_left }}">--:--</span>)
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if s.audio_url %}
+                {% if s.loop_audio %}Looping{% else %}Plays once{% endif %}
               {% else %}
                 —
               {% endif %}
@@ -52,11 +60,18 @@
                   <button type="submit">Clear Countdown</button>
                 </form>
               {% endif %}
+              {% if s.audio_url %}
+                <form method="post">
+                  <input type="hidden" name="Site" value="{{ s.site }}">
+                  <input type="hidden" name="action" value="clear_audio">
+                  <button type="submit">Stop Audio</button>
+                </form>
+              {% endif %}
               <a href="{{ url_for('site_status', site=s.site) }}" target="_blank" rel="noopener">Broadcast to TV Screens</a>
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="5" class="empty-row">No sites on file yet.</td></tr>
+          <tr><td colspan="6" class="empty-row">No sites on file yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -107,6 +122,40 @@
       </div>
       <input type="hidden" name="action" value="set_countdown">
       <button type="submit">Set Countdown</button>
+    </form>
+  </section>
+
+  <section class="add-form">
+    <h2>Set Audio</h2>
+    <p class="page-subtitle">
+      Plays once by default the moment it's picked up (viewers need to have clicked "Enable
+      Alarm Audio" on Site Status at least once, same as every other sound in this app -
+      browsers block unprompted autoplay). Check "Loop" for it to repeat until you click "Stop
+      Audio" above.
+    </p>
+    <form method="post" enctype="multipart/form-data">
+      <div class="form-grid">
+        <label>
+          Site
+          <select name="Site">
+            {% for s in known_sites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          Audio URL
+          <input type="url" name="AudioUrl" placeholder="https://...">
+        </label>
+        <label>
+          Or upload a file
+          <input type="file" name="Audio" accept="audio/*">
+        </label>
+      </div>
+      <label class="checkbox-label">
+        <input type="checkbox" name="Loop">
+        Loop until stopped
+      </label>
+      <input type="hidden" name="action" value="set_audio">
+      <button type="submit">Broadcast Audio</button>
     </form>
   </section>
 

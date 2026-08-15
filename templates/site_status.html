@@ -86,6 +86,7 @@
             <button type="button" id="sound-btn">Enable Alarm Audio</button>
           </div>
           <audio id="alarm-audio" loop></audio>
+          <audio id="custom-audio"></audio>
         </div>
       </div>
 
@@ -112,6 +113,7 @@
         var speakBtn = document.getElementById('speak-btn');
         var soundBtn = document.getElementById('sound-btn');
         var audioEl = document.getElementById('alarm-audio');
+        var customAudioEl = document.getElementById('custom-audio');
         var destroyedScreenEl = document.getElementById('warhead-destroyed-screen');
         var imageScreenEl = document.getElementById('announcement-image-screen');
         var imageEl = document.getElementById('announcement-image');
@@ -365,6 +367,26 @@
           }
         }
 
+        // playNow is true only when audio_set_at just changed - i.e. an
+        // admin actually broadcast (or re-broadcast) this clip, as opposed
+        // to a routine poll re-confirming the same still-active clip, which
+        // must not restart playback from the beginning every 12 seconds.
+        function applyCustomAudio(scr, playNow) {
+          if (!scr || !scr.audio_url) {
+            customAudioEl.pause();
+            customAudioEl.removeAttribute('src');
+            return;
+          }
+          if (customAudioEl.getAttribute('src') !== scr.audio_url) {
+            customAudioEl.src = scr.audio_url;
+          }
+          customAudioEl.loop = !!scr.loop_audio;
+          if (playNow && soundEnabled) {
+            customAudioEl.currentTime = 0;
+            customAudioEl.play().catch(function () {});
+          }
+        }
+
         fullscreenBtn.addEventListener('click', function () {
           if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -382,6 +404,7 @@
           soundEnabled = true;
           soundBtn.textContent = 'Alarm Audio: On';
           playAlarmSound(current.sound);
+          applyCustomAudio(current.screen, true);
         });
 
         refreshTimes();
@@ -393,6 +416,7 @@
         applyWarhead(current.warhead);
         applyAnnouncementCountdown(current.announcements.length ? current.announcements[0] : null);
         applyScreenCountdown(current.screen);
+        applyCustomAudio(current.screen, false);
 
         setInterval(function () {
           fetch('{{ url_for("site_status_data") }}?site=' + encodeURIComponent(site))
@@ -434,6 +458,9 @@
                 }
               }
 
+              var oldAudioSetAt = current.screen ? current.screen.audio_set_at : '';
+              var newAudioSetAt = data.screen ? data.screen.audio_set_at : '';
+
               current = data;
               // Re-applying on every poll (not just on change) resyncs the
               // local countdown/beep tickers with the server's seconds_left,
@@ -442,6 +469,7 @@
               applyWarhead(data.warhead);
               applyAnnouncementCountdown(newest);
               applyScreenCountdown(data.screen);
+              applyCustomAudio(data.screen, !!newAudioSetAt && newAudioSetAt !== oldAudioSetAt);
             })
             .catch(function () {});
         }, 12000);

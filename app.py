@@ -187,8 +187,10 @@ def _screen_control_state(site):
             "countdown_label": "",
             "countdown_seconds": None,
             "seconds_left": None,
+            "audio_url": None,
+            "loop_audio": False,
+            "audio_set_at": "",
             "set_by": "",
-            "set_at": "",
         }
 
     countdown = row.get("Countdown Seconds", "")
@@ -209,8 +211,10 @@ def _screen_control_state(site):
         "countdown_label": row.get("Countdown Label", "") or "",
         "countdown_seconds": countdown_seconds,
         "seconds_left": seconds_left,
+        "audio_url": row.get("Audio URL", "") or None,
+        "loop_audio": str(row.get("Loop Audio", "")).strip().lower() == "yes",
+        "audio_set_at": row.get("Audio Set At", "") or "",
         "set_by": row.get("Set By", "") or "",
-        "set_at": row.get("Countdown Set At", "") or "",
     }
 
 
@@ -666,13 +670,17 @@ def warhead():
                     duration, "shown" if show_countdown else "hidden"
                 ),
             )
-            # Arming is a last-resort action - force the site's alarm to
-            # Evacuation too, same as a real containment-breach protocol would.
-            alarm_row = sc.set_site_alarm(
-                site, 7, "Warhead armed - evacuate immediately", session.get("staff_name", ""), timestamp
-            )
-            if not alarm_row or str(alarm_row.get("Level", "")) != "7":
-                _log_change("Site Alarms", site, 'Level: -> "7: Evacuation" (warhead armed)')
+            if show_countdown:
+                # Arming is a last-resort action - force the site's alarm to
+                # Evacuation too, same as a real containment-breach protocol
+                # would. Skipped entirely when the countdown is hidden - a
+                # silent arm must not tip anyone off via the alarm panel
+                # either, or "silent" would only mean "no countdown banner".
+                alarm_row = sc.set_site_alarm(
+                    site, 7, "Warhead armed - evacuate immediately", session.get("staff_name", ""), timestamp
+                )
+                if not alarm_row or str(alarm_row.get("Level", "")) != "7":
+                    _log_change("Site Alarms", site, 'Level: -> "7: Evacuation" (warhead armed)')
 
         elif site and action == "disarm":
             sc.set_warhead(site, "safe", "", "", "")
@@ -700,16 +708,15 @@ def warhead():
 
 @app.route("/screen", methods=["GET", "POST"])
 def screen_control():
-    # Independent of Announcements/Alarms - sets an image takeover or a
-    # countdown directly on a site's Site Status screen, with no popup, no
-    # TTS "Announcement from X" wrapper, and no entry in the Site Broadcast
-    # list. A persistent override, not a broadcast log.
+    # Independent of Announcements/Alarms - sets an image takeover, a
+    # countdown, and/or a custom audio clip directly on a site's Site Status
+    # screen, with no popup, no TTS "Announcement from X" wrapper, and no
+    # entry in the Site Broadcast list. A persistent override, not a log.
     if request.method == "POST":
         site = request.form.get("Site", "").strip()
         action = request.form.get("action", "")
 
         if site:
-            current = _get_screen_control(site) or {}
             editor = session.get("staff_name", "")
             timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -722,14 +729,7 @@ def screen_control():
                     except Exception:
                         pass
                 if image_url:
-                    sc.set_screen_control(
-                        site,
-                        image_url,
-                        current.get("Countdown Label", ""),
-                        current.get("Countdown Seconds", ""),
-                        current.get("Countdown Set At", ""),
-                        editor,
-                    )
+                    sc.set_screen_control(site, {"Image URL": image_url, "Set By": editor})
                     _log_change("Screen Control", site, "Image set")
 
             elif action == "set_countdown":
@@ -737,23 +737,54 @@ def screen_control():
                 seconds_input = request.form.get("Seconds", "").strip()
                 seconds = seconds_input if seconds_input.isdigit() and int(seconds_input) > 0 else ""
                 if seconds:
-                    sc.set_screen_control(site, current.get("Image URL", ""), label, seconds, timestamp, editor)
+                    sc.set_screen_control(
+                        site,
+                        {
+                            "Countdown Label": label,
+                            "Countdown Seconds": seconds,
+                            "Countdown Set At": timestamp,
+                            "Set By": editor,
+                        },
+                    )
                     _log_change("Screen Control", site, 'Countdown set: "{}" ({}s)'.format(label, seconds))
 
+            elif action == "set_audio":
+                audio_url = request.form.get("AudioUrl", "").strip()
+                audio_file = request.files.get("Audio")
+                if audio_file and audio_file.filename:
+                    try:
+                        audio_url = drive_client.upload_audio(audio_file)
+                    except Exception:
+                        pass
+                loop = request.form.get("Loop") == "on"
+                if audio_url:
+                    sc.set_screen_control(
+                        site,
+                        {
+                            "Audio URL": audio_url,
+                            "Loop Audio": "Yes" if loop else "No",
+                            "Audio Set At": timestamp,
+                            "Set By": editor,
+                        },
+                    )
+                    _log_change("Screen Control", site, "Audio set ({})".format("looping" if loop else "plays once"))
+
             elif action == "clear_image":
-                sc.set_screen_control(
-                    site,
-                    "",
-                    current.get("Countdown Label", ""),
-                    current.get("Countdown Seconds", ""),
-                    current.get("Countdown Set At", ""),
-                    editor,
-                )
+                sc.set_screen_control(site, {"Image URL": "", "Set By": editor})
                 _log_change("Screen Control", site, "Image cleared")
 
             elif action == "clear_countdown":
-                sc.set_screen_control(site, current.get("Image URL", ""), "", "", "", editor)
+                sc.set_screen_control(
+                    site,
+                    {"Countdown Label": "", "Countdown Seconds": "", "Countdown Set At": "", "Set By": editor},
+                )
                 _log_change("Screen Control", site, "Countdown cleared")
+
+            elif action == "clear_audio":
+                sc.set_screen_control(
+                    site, {"Audio URL": "", "Loop Audio": "No", "Audio Set At": "", "Set By": editor}
+                )
+                _log_change("Screen Control", site, "Audio stopped")
 
         return redirect(url_for("screen_control"))
 

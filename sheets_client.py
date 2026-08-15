@@ -79,11 +79,22 @@ TABS = {
     },
     "screen_control": {
         "title": "Screen Control",
-        # Countdown Set At is its own column, separate from Set By - the
-        # image and the countdown are cleared independently, and the
-        # countdown's remaining-time calculation needs its own start time to
-        # survive the image being cleared (or vice versa).
-        "headers": ["Site", "Image URL", "Countdown Label", "Countdown Seconds", "Countdown Set At", "Set By"],
+        # Countdown Set At and Audio Set At are each their own column,
+        # separate from Set By - image/countdown/audio are cleared
+        # independently, and both the countdown's remaining-time
+        # calculation and audio's "is this a new play request" check need
+        # their own timestamp to survive an unrelated field being cleared.
+        "headers": [
+            "Site",
+            "Image URL",
+            "Countdown Label",
+            "Countdown Seconds",
+            "Countdown Set At",
+            "Audio URL",
+            "Loop Audio",
+            "Audio Set At",
+            "Set By",
+        ],
     },
 }
 
@@ -248,17 +259,16 @@ def set_warhead(site, status, armed_by, armed_at, detonate_at, show_countdown=Tr
     )
 
 
-def set_screen_control(site, image_url, countdown_label, countdown_seconds, countdown_set_at, set_by):
-    return _upsert_by_column(
-        "screen_control",
-        "Site",
-        site,
-        {
-            "Site": site,
-            "Image URL": image_url,
-            "Countdown Label": countdown_label,
-            "Countdown Seconds": countdown_seconds,
-            "Countdown Set At": countdown_set_at,
-            "Set By": set_by,
-        },
-    )
+def set_screen_control(site, fields):
+    """Merges `fields` (a partial dict of columns to change) onto the site's
+    existing Screen Control row - image/countdown/audio are set and cleared
+    independently, so callers only pass the columns they're actually
+    touching and everything else is left as-is."""
+    headers = TABS["screen_control"]["headers"]
+    ws = get_worksheet("screen_control")
+    records = ws.get_all_records()
+    current = next((r for r in records if str(r.get("Site", "")) == str(site)), None)
+    merged = {h: (current.get(h, "") if current else "") for h in headers}
+    merged["Site"] = site
+    merged.update(fields)
+    return _upsert_by_column("screen_control", "Site", site, merged)

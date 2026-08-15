@@ -305,9 +305,12 @@ Site Alarms - one live row per site (`sheets_client.set_warhead()`, sharing the
   the privileged-only route). A "Detonation time (seconds)" field lets you override the
   default (`WARHEAD_ARM_SECONDS`, 300) per arm — falls back to the default if left blank or
   invalid. A "Display countdown banner on Site Status screen" checkbox (checked by default)
-  controls `Show Countdown` — uncheck it to arm silently, still forcing Level 7 and still
-  detonating on schedule, just without the visible/audible countdown on that site's screen.
-  Arming forces the site's alarm to Level 7 Evacuation, all logged to Edit History. Any
+  controls `Show Countdown`. When checked, arming also forces the site's alarm to Level 7
+  Evacuation (same as a real containment-breach protocol) - but when unchecked, that
+  escalation is skipped entirely: the warhead is still armed and still detonates on schedule,
+  but the alarm panel stays exactly as it was, so a silent arm doesn't tip anyone off via the
+  Level 7 message either. Every arm/disarm/reset action is logged to Edit History regardless
+  (the audit trail always records it - only the *visible* Site Status screen stays quiet). Any
   O5/Site Director can Disarm an armed site before it reaches zero, or Reset a detonated one
   back to Safe. Each row also has a "Broadcast to TV Screens" link that opens that site's
   Site Status in a new tab.
@@ -330,21 +333,34 @@ Site Alarms - one live row per site (`sheets_client.set_warhead()`, sharing the
 
 ## Screen Control
 
-A per-site image/countdown override, deliberately independent of Announcements: no popup, no
-`SpeechSynthesis` "Announcement from X" wrapper, no entry in the Site Broadcast list - just a
-persistent override on that site's screen until cleared. Lives in its own `Screen Control`
-Sheet tab (`Site`, `Image URL`, `Countdown Label`, `Countdown Seconds`, `Countdown Set At`,
-`Set By`), upserted one row per site via `sheets_client.set_screen_control()`.
+A per-site image/countdown/audio override, deliberately independent of Announcements: no
+popup, no `SpeechSynthesis` "Announcement from X" wrapper, no entry in the Site Broadcast
+list - just a persistent override on that site's screen until cleared. Lives in its own
+`Screen Control` Sheet tab (`Site`, `Image URL`, `Countdown Label`, `Countdown Seconds`,
+`Countdown Set At`, `Audio URL`, `Loop Audio`, `Audio Set At`, `Set By`), upserted one row per
+site via `sheets_client.set_screen_control(site, fields)` - `fields` is a partial dict of
+just the columns being touched, merged onto the existing row, so setting the image doesn't
+require re-passing the countdown/audio values back in.
 
-- **`/screen`** (privileged-only, linked as "Screen Control") — separate "Set Image" (URL or
-  upload, same `drive_client.upload_image()` as Announcements) and "Set Countdown" (label +
-  seconds) forms, each independently clearable ("Clear Image" / "Clear Countdown") without
-  touching the other.
-- The image and countdown are cleared independently but originally shared one "when was this
-  set" timestamp - clearing the image was wiping the timestamp the countdown's live
-  remaining-time calculation depended on, silently breaking any active countdown. Fixed by
-  giving the countdown its own `Countdown Set At` column, separate from `Set By` (which stays
-  a simple "who last touched this row" field, not used in any time math).
+- **`/screen`** (privileged-only, linked as "Screen Control") — three independent forms: "Set
+  Image" (URL or upload, `drive_client.upload_image()`), "Set Countdown" (label + seconds),
+  and "Set Audio" (URL or upload, `drive_client.upload_audio()` - a sibling that, like
+  `upload_image()`, returns a directly-embeddable link rather than `upload_scan()`'s
+  human-facing viewer page). Each has its own clear action ("Clear Image" / "Clear Countdown"
+  / "Stop Audio") that doesn't touch the other two.
+- **Audio**: plays once by default; check "Loop" on the form to have it repeat until "Stop
+  Audio" is clicked. Playback is gated behind the same "Enable Alarm Audio" button as every
+  other sound on Site Status (autoplay policy), and re-broadcasting the exact same URL still
+  triggers a fresh play — `Audio Set At` gets a new timestamp each time regardless of whether
+  the URL changed, which is what the Site Status poller actually diffs on to decide "is this
+  a new play request" (comparing just the URL would miss a deliberate replay of the same
+  clip).
+- Image/countdown/audio are cleared independently but each needs its own "when was this set"
+  timestamp for its own live calculation or replay-detection to survive an unrelated field
+  being cleared - `Countdown Set At` and `Audio Set At` are separate columns from the general
+  `Set By` (a simple "who last touched this row" field, not used in any time math). This was
+  a real bug caught while first building the image/countdown pair: sharing one timestamp
+  meant clearing the image wiped the timestamp the countdown depended on.
 - On Site Status, precedence for the full-screen image takeover is: warhead detonation >
   Screen Control image > announcement image. Screen Control's countdown gets its own banner
   (`#screen-banner`) and can show alongside the warhead's and/or an announcement's countdown

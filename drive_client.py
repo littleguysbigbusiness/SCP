@@ -51,9 +51,17 @@ def upload_scan(file_storage):
     return created.get("webViewLink") or "https://drive.google.com/file/d/{}/view".format(file_id)
 
 
-def upload_image(file_storage):
+def _upload_direct_url(file_storage, name_prefix):
     # unlike upload_scan's webViewLink (an HTML viewer page - wrong for an
-    # <img src>), this returns a URL that serves the raw image bytes
-    # directly, suitable for embedding as a full-screen takeover.
-    created = _upload_file(file_storage, "image")
+    # <img>/<audio> src), this returns a URL that serves the raw file bytes
+    # directly, suitable for embedding.
+    created = _upload_file(file_storage, name_prefix)
     return "https://drive.google.com/uc?export=view&id={}".format(created["id"])
+
+
+def upload_image(file_storage):
+    return _upload_direct_url(file_storage, "image")
+
+
+def upload_audio(file_storage):
+    return _upload_direct_url(file_storage, "audio")
