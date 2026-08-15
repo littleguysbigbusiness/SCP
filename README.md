@@ -27,8 +27,8 @@ matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" 
 director" (case-insensitive substring match):
 
 - **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Class-D
-  Records, Test Logs, Print, Edit History, Alarms (includes Announcements), Warhead, Site
-  Status.
+  Records, Test Logs, Print, Edit History, Alarms (includes Announcements), Warhead, Screen
+  Control, Site Status.
 - **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
   page. Any other URL redirects there.
 
@@ -258,10 +258,11 @@ append-only log rather than the one-row-per-site upsert that Site Alarms uses.
 
 An announcement can optionally carry a countdown and/or an image, on top of the message:
 
-- **Countdown** — the broadcast form takes minutes, stored as `Countdown Seconds`; like the
-  warhead, remaining time is computed live from `Countdown Seconds` minus elapsed time since
+- **Countdown** — the broadcast form takes seconds directly, stored as `Countdown Seconds`;
+  remaining time is computed live from `Countdown Seconds` minus elapsed time since
   `Timestamp` (`_announcement_payload()`), not stored as a fixed target, so it's always
-  correct on read. Shows as a ticking banner on Site Status.
+  correct on read. Shows as a ticking banner on Site Status. A countdown alone (no message,
+  no image) is a valid post - the save check is `message or image_url or countdown_seconds`.
 - **Image** — either paste a URL or upload a file (both routes are supported; an upload
   takes priority if both are given). An uploaded file goes through
   `drive_client.upload_image()`, a sibling of the Archives scan uploader that returns a
@@ -301,14 +302,15 @@ Site Alarms - one live row per site (`sheets_client.set_warhead()`, sharing the
 - **`/warhead`** (privileged-only, linked as "Warhead") — arming requires turning both "KEY
   1" and "KEY 2" toggle buttons before the red "Arm Warhead" button becomes clickable (a
   client-side gate for the classic two-key launch feel; the real security boundary is still
-  the privileged-only route). A "Display countdown banner on Site Status screen" checkbox
-  (checked by default) controls `Show Countdown` — uncheck it to arm silently, still forcing
-  Level 7 and still detonating on schedule, just without the visible/audible countdown on
-  that site's screen. Arming forces the site's alarm to Level 7 Evacuation and starts a
-  5-minute countdown (`WARHEAD_ARM_SECONDS`), all logged to Edit History. Any O5/Site
-  Director can Disarm an armed site before it reaches zero, or Reset a detonated one back to
-  Safe. Each row also has a "Broadcast to TV Screens" link that opens that site's Site Status
-  in a new tab.
+  the privileged-only route). A "Detonation time (seconds)" field lets you override the
+  default (`WARHEAD_ARM_SECONDS`, 300) per arm — falls back to the default if left blank or
+  invalid. A "Display countdown banner on Site Status screen" checkbox (checked by default)
+  controls `Show Countdown` — uncheck it to arm silently, still forcing Level 7 and still
+  detonating on schedule, just without the visible/audible countdown on that site's screen.
+  Arming forces the site's alarm to Level 7 Evacuation, all logged to Edit History. Any
+  O5/Site Director can Disarm an armed site before it reaches zero, or Reset a detonated one
+  back to Safe. Each row also has a "Broadcast to TV Screens" link that opens that site's
+  Site Status in a new tab.
 - There's no background job - whether the countdown has reached zero is computed lazily
   whenever a site's warhead state is read (`_warhead_state()`), and the "detonated"
   transition is written back to the sheet at that point so it sticks from then on.
@@ -325,6 +327,29 @@ Site Alarms - one live row per site (`sheets_client.set_warhead()`, sharing the
   the Fullscreen API only shows the fullscreened element's own subtree, so anything outside
   it (the countdown banner used to be a sibling, not a child) would otherwise vanish the
   moment the screen goes fullscreen.
+
+## Screen Control
+
+A per-site image/countdown override, deliberately independent of Announcements: no popup, no
+`SpeechSynthesis` "Announcement from X" wrapper, no entry in the Site Broadcast list - just a
+persistent override on that site's screen until cleared. Lives in its own `Screen Control`
+Sheet tab (`Site`, `Image URL`, `Countdown Label`, `Countdown Seconds`, `Countdown Set At`,
+`Set By`), upserted one row per site via `sheets_client.set_screen_control()`.
+
+- **`/screen`** (privileged-only, linked as "Screen Control") — separate "Set Image" (URL or
+  upload, same `drive_client.upload_image()` as Announcements) and "Set Countdown" (label +
+  seconds) forms, each independently clearable ("Clear Image" / "Clear Countdown") without
+  touching the other.
+- The image and countdown are cleared independently but originally shared one "when was this
+  set" timestamp - clearing the image was wiping the timestamp the countdown's live
+  remaining-time calculation depended on, silently breaking any active countdown. Fixed by
+  giving the countdown its own `Countdown Set At` column, separate from `Set By` (which stays
+  a simple "who last touched this row" field, not used in any time math).
+- On Site Status, precedence for the full-screen image takeover is: warhead detonation >
+  Screen Control image > announcement image. Screen Control's countdown gets its own banner
+  (`#screen-banner`) and can show alongside the warhead's and/or an announcement's countdown
+  banner at the same time - unlike the exclusive image takeover, stacking multiple countdown
+  banners doesn't conflict.
 
 ## Staff Lookup
 

@@ -171,6 +171,49 @@ def _warhead_state(site):
     }
 
 
+def _get_screen_control(site):
+    if not site:
+        return None
+    rows = sc.get_rows("screen_control")
+    return next((r for r in rows if str(r.get("Site", "")) == str(site)), None)
+
+
+def _screen_control_state(site):
+    row = _get_screen_control(site)
+    if not row:
+        return {
+            "site": site,
+            "image_url": None,
+            "countdown_label": "",
+            "countdown_seconds": None,
+            "seconds_left": None,
+            "set_by": "",
+            "set_at": "",
+        }
+
+    countdown = row.get("Countdown Seconds", "")
+    countdown_seconds = int(countdown) if str(countdown).isdigit() else None
+    seconds_left = None
+    if countdown_seconds is not None:
+        try:
+            countdown_set_at = datetime.fromisoformat(row.get("Countdown Set At", ""))
+        except ValueError:
+            countdown_set_at = None
+        if countdown_set_at is not None:
+            elapsed = (datetime.now(timezone.utc) - countdown_set_at).total_seconds()
+            seconds_left = max(0, int(countdown_seconds - elapsed))
+
+    return {
+        "site": site,
+        "image_url": row.get("Image URL", "") or None,
+        "countdown_label": row.get("Countdown Label", "") or "",
+        "countdown_seconds": countdown_seconds,
+        "seconds_left": seconds_left,
+        "set_by": row.get("Set By", "") or "",
+        "set_at": row.get("Countdown Set At", "") or "",
+    }
+
+
 ANNOUNCEMENT_ALL_SITES = "All Sites"
 
 
@@ -609,16 +652,18 @@ def warhead():
 
         if site and action == "arm":
             show_countdown = request.form.get("ShowCountdown") == "on"
-            timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-            detonate_at = (datetime.now(timezone.utc) + timedelta(seconds=WARHEAD_ARM_SECONDS)).isoformat(
-                timespec="seconds"
+            requested_seconds = request.form.get("DetonateSeconds", "").strip()
+            duration = int(requested_seconds) if requested_seconds.isdigit() and int(requested_seconds) > 0 else (
+                WARHEAD_ARM_SECONDS
             )
+            timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            detonate_at = (datetime.now(timezone.utc) + timedelta(seconds=duration)).isoformat(timespec="seconds")
             sc.set_warhead(site, "armed", session.get("staff_name", ""), timestamp, detonate_at, show_countdown)
             _log_change(
                 "Warhead",
                 site,
-                'Status: "safe" -> "armed" (detonates in {}:00, countdown {})'.format(
-                    WARHEAD_ARM_SECONDS // 60, "shown" if show_countdown else "hidden"
+                'Status: "safe" -> "armed" (detonates in {}s, countdown {})'.format(
+                    duration, "shown" if show_countdown else "hidden"
                 ),
             )
             # Arming is a last-resort action - force the site's alarm to
@@ -653,6 +698,77 @@ def warhead():
     )
 
 
+@app.route("/screen", methods=["GET", "POST"])
+def screen_control():
+    # Independent of Announcements/Alarms - sets an image takeover or a
+    # countdown directly on a site's Site Status screen, with no popup, no
+    # TTS "Announcement from X" wrapper, and no entry in the Site Broadcast
+    # list. A persistent override, not a broadcast log.
+    if request.method == "POST":
+        site = request.form.get("Site", "").strip()
+        action = request.form.get("action", "")
+
+        if site:
+            current = _get_screen_control(site) or {}
+            editor = session.get("staff_name", "")
+            timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+            if action == "set_image":
+                image_url = request.form.get("ImageUrl", "").strip()
+                image_file = request.files.get("Image")
+                if image_file and image_file.filename:
+                    try:
+                        image_url = drive_client.upload_image(image_file)
+                    except Exception:
+                        pass
+                if image_url:
+                    sc.set_screen_control(
+                        site,
+                        image_url,
+                        current.get("Countdown Label", ""),
+                        current.get("Countdown Seconds", ""),
+                        current.get("Countdown Set At", ""),
+                        editor,
+                    )
+                    _log_change("Screen Control", site, "Image set")
+
+            elif action == "set_countdown":
+                label = request.form.get("Label", "").strip()
+                seconds_input = request.form.get("Seconds", "").strip()
+                seconds = seconds_input if seconds_input.isdigit() and int(seconds_input) > 0 else ""
+                if seconds:
+                    sc.set_screen_control(site, current.get("Image URL", ""), label, seconds, timestamp, editor)
+                    _log_change("Screen Control", site, 'Countdown set: "{}" ({}s)'.format(label, seconds))
+
+            elif action == "clear_image":
+                sc.set_screen_control(
+                    site,
+                    "",
+                    current.get("Countdown Label", ""),
+                    current.get("Countdown Seconds", ""),
+                    current.get("Countdown Set At", ""),
+                    editor,
+                )
+                _log_change("Screen Control", site, "Image cleared")
+
+            elif action == "clear_countdown":
+                sc.set_screen_control(site, current.get("Image URL", ""), "", "", "", editor)
+                _log_change("Screen Control", site, "Countdown cleared")
+
+        return redirect(url_for("screen_control"))
+
+    error = None
+    known_sites = []
+    statuses = []
+    try:
+        known_sites = _known_sites()
+        statuses = [_screen_control_state(site) for site in known_sites]
+    except Exception as exc:
+        error = str(exc)
+
+    return render_template("screen.html", statuses=statuses, known_sites=known_sites, error=error)
+
+
 @app.route("/site-status")
 def site_status():
     error = None
@@ -662,6 +778,7 @@ def site_status():
     announcements = []
     alarm_history = []
     warhead_state = None
+    screen_state = None
     try:
         known_sites = _known_sites()
         selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
@@ -670,6 +787,7 @@ def site_status():
             announcements = _recent_announcements(selected_site)
             alarm_history = _alarm_history(selected_site)
             warhead_state = _warhead_state(selected_site)
+            screen_state = _screen_control_state(selected_site)
     except Exception as exc:
         error = str(exc)
 
@@ -679,6 +797,7 @@ def site_status():
         announcements=announcements,
         alarm_history=alarm_history,
         warhead=warhead_state,
+        screen=screen_state,
         selected_site=selected_site,
         known_sites=known_sites,
         error=error,
@@ -697,6 +816,7 @@ def site_status_data():
         data["announcements"] = _recent_announcements(selected_site)
         data["alarm_history"] = _alarm_history(selected_site)
         data["warhead"] = _warhead_state(selected_site)
+        data["screen"] = _screen_control_state(selected_site)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
@@ -712,13 +832,8 @@ def announcements():
         site = request.form.get("Site", "").strip() or ANNOUNCEMENT_ALL_SITES
         message = request.form.get("Message", "").strip()
 
-        countdown_minutes = request.form.get("CountdownMinutes", "").strip()
-        countdown_seconds = ""
-        if countdown_minutes:
-            try:
-                countdown_seconds = str(int(float(countdown_minutes) * 60))
-            except ValueError:
-                countdown_seconds = ""
+        countdown_input = request.form.get("CountdownSeconds", "").strip()
+        countdown_seconds = countdown_input if countdown_input.isdigit() and int(countdown_input) > 0 else ""
 
         image_url = request.form.get("ImageUrl", "").strip()
         image_file = request.files.get("Image")
@@ -728,7 +843,7 @@ def announcements():
             except Exception:
                 pass  # fall back to whatever pasted URL (if any) - don't block the broadcast on an upload failure
 
-        if message or image_url:
+        if message or image_url or countdown_seconds:
             sc.add_row(
                 "announcements",
                 {

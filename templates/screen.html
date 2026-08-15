@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Screen Control // SCP Foundation{% endblock %}
+{% block content %}
+  <h1 class="page-title">Screen Control</h1>
+  <p class="page-subtitle">
+    Push an image or a countdown straight to a site's Site Status screen - independent of
+    Alarms/Announcements, no popup, no spoken "Announcement from" wrapper. A persistent
+    override until you clear it.
+  </p>
+
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% endif %}
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Image</th>
+          <th>Countdown</th>
+          <th>Set By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in statuses %}
+          <tr>
+            <td>{{ s.site }}</td>
+            <td>{% if s.image_url %}Active{% else %}—{% endif %}</td>
+            <td>
+              {% if s.countdown_seconds is not none %}
+                {{ s.countdown_label or 'Countdown' }}
+                (<span class="warhead-countdown-cell" data-seconds="{{ s.seconds_left }}">--:--</span>)
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ s.set_by }}</td>
+            <td class="warhead-actions">
+              {% if s.image_url %}
+                <form method="post">
+                  <input type="hidden" name="Site" value="{{ s.site }}">
+                  <input type="hidden" name="action" value="clear_image">
+                  <button type="submit">Clear Image</button>
+                </form>
+              {% endif %}
+              {% if s.countdown_seconds is not none %}
+                <form method="post">
+                  <input type="hidden" name="Site" value="{{ s.site }}">
+                  <input type="hidden" name="action" value="clear_countdown">
+                  <button type="submit">Clear Countdown</button>
+                </form>
+              {% endif %}
+              <a href="{{ url_for('site_status', site=s.site) }}" target="_blank" rel="noopener">Broadcast to TV Screens</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty-row">No sites on file yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="add-form">
+    <h2>Set Image</h2>
+    <form method="post" enctype="multipart/form-data">
+      <div class="form-grid">
+        <label>
+          Site
+          <select name="Site">
+            {% for s in known_sites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          Image URL
+          <input type="url" name="ImageUrl" placeholder="https://...">
+        </label>
+        <label>
+          Or upload a file
+          <input type="file" name="Image" accept="image/*">
+        </label>
+      </div>
+      <input type="hidden" name="action" value="set_image">
+      <button type="submit">Set Image</button>
+    </form>
+  </section>
+
+  <section class="add-form">
+    <h2>Set Countdown</h2>
+    <form method="post">
+      <div class="form-grid">
+        <label>
+          Site
+          <select name="Site">
+            {% for s in known_sites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          Label
+          <input type="text" name="Label" placeholder="e.g. Lockdown lifts in">
+        </label>
+        <label>
+          Seconds
+          <input type="number" name="Seconds" min="1" step="1" placeholder="e.g. 600" required>
+        </label>
+      </div>
+      <input type="hidden" name="action" value="set_countdown">
+      <button type="submit">Set Countdown</button>
+    </form>
+  </section>
+
+  <script>
+    document.querySelectorAll('.warhead-countdown-cell[data-seconds]').forEach(function (cell) {
+      var s = parseInt(cell.dataset.seconds, 10);
+      if (isNaN(s)) { cell.textContent = '--:--'; return; }
+      (function tick() {
+        if (s <= 0) { cell.textContent = '00:00'; return; }
+        var m = Math.floor(s / 60), sec = s % 60;
+        cell.textContent = (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+        s -= 1;
+        setTimeout(tick, 1000);
+      })();
+    });
+  </script>
+{% endblock %}

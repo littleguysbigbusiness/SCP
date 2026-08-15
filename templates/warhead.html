@@ -77,6 +77,10 @@
           {% for s in known_sites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
         </select>
       </label>
+      <label>
+        Detonation time (seconds)
+        <input type="number" id="arm-seconds-input" name="DetonateSeconds" form="arm-form" min="1" step="1" value="{{ arm_seconds }}">
+      </label>
     </div>
 
     <div class="key-panel">

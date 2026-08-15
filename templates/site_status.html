@@ -46,6 +46,10 @@
             <span id="announcement-banner-text"></span>
           </div>
 
+          <div class="announcement-banner hidden" id="screen-banner">
+            <span id="screen-banner-text"></span>
+          </div>
+
           <div class="alarm-status-site">SITE {{ selected_site }}</div>
           <div class="alarm-status-label" id="alarm-label">LEVEL {{ state.level }}: {{ state.label }}</div>
           <div class="alarm-status-desc" id="alarm-desc">{{ state.description }}</div>
@@ -117,11 +121,14 @@
         var warheadCountdownEl = document.getElementById('warhead-countdown');
         var announcementBannerEl = document.getElementById('announcement-banner');
         var announcementBannerTextEl = document.getElementById('announcement-banner-text');
+        var screenBannerEl = document.getElementById('screen-banner');
+        var screenBannerTextEl = document.getElementById('screen-banner-text');
         var soundBase = {{ url_for('static', filename='assets/alarms/')|tojson }};
         var soundEnabled = false;
         var popupTimer = null;
         var warheadTickTimer = null;
         var announcementTickTimer = null;
+        var screenTickTimer = null;
         var audioCtx = null;
 
         var current = {
@@ -133,7 +140,8 @@
           sound: {{ state.sound|tojson }},
           announcements: {{ announcements|tojson }},
           alarm_history: {{ alarm_history|tojson }},
-          warhead: {{ warhead|tojson }}
+          warhead: {{ warhead|tojson }},
+          screen: {{ screen|tojson }}
         };
 
         function timeAgo(iso) {
@@ -267,25 +275,38 @@
           }
         }
 
-        // Exactly one of these three is ever shown - decided together so a
-        // detonation and an image takeover can never both toggle "visible"
-        // out of sync with each other.
+        // Exactly one of these three is ever shown, and exactly one image
+        // source wins if more than one is active - decided together here so
+        // a detonation, a Screen Control image, and an announcement image
+        // can never toggle "visible" out of sync with each other.
+        // Precedence: detonation > Screen Control image > announcement image.
         function updateScreenMode() {
           var w = current.warhead;
+          var scr = current.screen;
           var latest = current.announcements.length ? current.announcements[0] : null;
           var detonated = w && w.status === 'detonated';
-          var hasImage = !detonated && latest && latest.image_url;
+
+          var activeImage = null;
+          var activeAuthor = '';
+          var activeCaption = '';
+          if (!detonated && scr && scr.image_url) {
+            activeImage = scr.image_url;
+          } else if (!detonated && latest && latest.image_url) {
+            activeImage = latest.image_url;
+            activeAuthor = latest.author;
+            activeCaption = latest.message;
+          }
 
           destroyedScreenEl.classList.toggle('hidden', !detonated);
-          imageScreenEl.classList.toggle('hidden', !hasImage);
-          normalWrapEl.classList.toggle('hidden', detonated || hasImage);
+          imageScreenEl.classList.toggle('hidden', !activeImage);
+          normalWrapEl.classList.toggle('hidden', detonated || !!activeImage);
 
           if (detonated) { audioEl.pause(); }
 
-          if (hasImage) {
-            imageEl.src = latest.image_url;
-            if (latest.message) {
-              imageCaptionEl.textContent = latest.author + ': ' + latest.message;
+          if (activeImage) {
+            imageEl.src = activeImage;
+            if (activeCaption) {
+              imageCaptionEl.textContent = activeAuthor + ': ' + activeCaption;
               imageCaptionEl.classList.remove('hidden');
             } else {
               imageCaptionEl.classList.add('hidden');
@@ -327,6 +348,23 @@
           }
         }
 
+        function applyScreenCountdown(scr) {
+          if (screenTickTimer) { clearInterval(screenTickTimer); screenTickTimer = null; }
+
+          if (scr && scr.countdown_seconds != null && scr.seconds_left != null) {
+            screenBannerEl.classList.remove('hidden');
+            var seconds = scr.seconds_left;
+            var label = scr.countdown_label || 'Countdown';
+            screenBannerTextEl.textContent = label + ' — ' + formatCountdown(seconds);
+            screenTickTimer = setInterval(function () {
+              seconds = Math.max(0, seconds - 1);
+              screenBannerTextEl.textContent = label + ' — ' + formatCountdown(seconds);
+            }, 1000);
+          } else {
+            screenBannerEl.classList.add('hidden');
+          }
+        }
+
         fullscreenBtn.addEventListener('click', function () {
           if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -354,6 +392,7 @@
         updateScreenMode();
         applyWarhead(current.warhead);
         applyAnnouncementCountdown(current.announcements.length ? current.announcements[0] : null);
+        applyScreenCountdown(current.screen);
 
         setInterval(function () {
           fetch('{{ url_for("site_status_data") }}?site=' + encodeURIComponent(site))
@@ -402,6 +441,7 @@
               updateScreenMode();
               applyWarhead(data.warhead);
               applyAnnouncementCountdown(newest);
+              applyScreenCountdown(data.screen);
             })
             .catch(function () {});
         }, 12000);

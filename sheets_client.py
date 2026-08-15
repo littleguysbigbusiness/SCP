@@ -77,6 +77,14 @@ TABS = {
         "title": "Warheads",
         "headers": ["Site", "Status", "Armed By", "Armed At", "Detonate At", "Show Countdown"],
     },
+    "screen_control": {
+        "title": "Screen Control",
+        # Countdown Set At is its own column, separate from Set By - the
+        # image and the countdown are cleared independently, and the
+        # countdown's remaining-time calculation needs its own start time to
+        # survive the image being cleared (or vice versa).
+        "headers": ["Site", "Image URL", "Countdown Label", "Countdown Seconds", "Countdown Set At", "Set By"],
+    },
 }
 
 _credentials = None
@@ -236,5 +244,21 @@ def set_warhead(site, status, armed_by, armed_at, detonate_at, show_countdown=Tr
             "Armed At": armed_at,
             "Detonate At": detonate_at,
             "Show Countdown": "Yes" if show_countdown else "No",
+        },
+    )
+
+
+def set_screen_control(site, image_url, countdown_label, countdown_seconds, countdown_set_at, set_by):
+    return _upsert_by_column(
+        "screen_control",
+        "Site",
+        site,
+        {
+            "Site": site,
+            "Image URL": image_url,
+            "Countdown Label": countdown_label,
+            "Countdown Seconds": countdown_seconds,
+            "Countdown Set At": countdown_set_at,
+            "Set By": set_by,
         },
     )
