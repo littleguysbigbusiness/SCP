@@ -80,25 +80,25 @@ ALARM_LEVELS = {
 
 
 def _known_sites():
+    # Deliberately doesn't swallow errors here - a Sheets API failure must
+    # surface to the caller as an error, not look identical to "no sites
+    # configured yet".
     sites = set()
     for tab in ("staff", "site_alarms"):
-        try:
-            for r in sc.get_rows(tab):
-                s = (r.get("Site") or "").strip()
-                if s:
-                    sites.add(s)
-        except Exception:
-            pass
+        for r in sc.get_rows(tab):
+            s = (r.get("Site") or "").strip()
+            if s:
+                sites.add(s)
     return sorted(sites)
 
 
 def _get_site_alarm(site):
+    # Also doesn't swallow errors - silently treating a database error as
+    # "no alarm row" would make a real Level 7 evacuation read as Level 1
+    # Normal Protocol if the Sheets API ever hiccups.
     if not site:
         return None
-    try:
-        rows = sc.get_rows("site_alarms")
-    except Exception:
-        return None
+    rows = sc.get_rows("site_alarms")
     return next((r for r in rows if str(r.get("Site", "")) == str(site)), None)
 
 
@@ -126,10 +126,7 @@ ANNOUNCEMENT_ALL_SITES = "All Sites"
 def _latest_announcement(site):
     if not site:
         return None
-    try:
-        rows = sc.get_rows("announcements")
-    except Exception:
-        return None
+    rows = sc.get_rows("announcements")
     relevant = [r for r in rows if r.get("Site") in (site, ANNOUNCEMENT_ALL_SITES)]
     return relevant[-1] if relevant else None
 
@@ -474,12 +471,12 @@ def alarms():
 
     error = None
     known_sites = []
+    statuses = []
     try:
         known_sites = _known_sites()
+        statuses = [_site_alarm_state(site) for site in known_sites]
     except Exception as exc:
         error = str(exc)
-
-    statuses = [_site_alarm_state(site) for site in known_sites]
 
     return render_template(
         "alarms.html", statuses=statuses, levels=ALARM_LEVELS, known_sites=known_sites, error=error
@@ -488,11 +485,19 @@ def alarms():
 
 @app.route("/site-status")
 def site_status():
-    known_sites = _known_sites()
-    selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
-
-    state = _site_alarm_state(selected_site) if selected_site else None
-    announcement = _announcement_payload(_latest_announcement(selected_site)) if selected_site else None
+    error = None
+    known_sites = []
+    selected_site = ""
+    state = None
+    announcement = None
+    try:
+        known_sites = _known_sites()
+        selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
+        if selected_site:
+            state = _site_alarm_state(selected_site)
+            announcement = _announcement_payload(_latest_announcement(selected_site))
+    except Exception as exc:
+        error = str(exc)
 
     return render_template(
         "site_status.html",
@@ -500,6 +505,7 @@ def site_status():
         announcement=announcement,
         selected_site=selected_site,
         known_sites=known_sites,
+        error=error,
     )
 
 
@@ -510,8 +516,12 @@ def site_status_data():
     if not selected_site:
         return jsonify({"error": "No site to report on."}), 404
 
-    data = _site_alarm_state(selected_site)
-    data["announcement"] = _announcement_payload(_latest_announcement(selected_site))
+    try:
+        data = _site_alarm_state(selected_site)
+        data["announcement"] = _announcement_payload(_latest_announcement(selected_site))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
     return jsonify(data)
 
 

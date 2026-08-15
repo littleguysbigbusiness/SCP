@@ -16,7 +16,9 @@
     </form>
   {% endif %}
 
-  {% if not state %}
+  {% if error %}
+    <div class="alert">Unable to reach the database: {{ error }}</div>
+  {% elif not state %}
     <div class="alert">No sites on file yet - add a Site value to a Staff record, or set an alert level for one from the Alarms page.</div>
   {% else %}
     <div
