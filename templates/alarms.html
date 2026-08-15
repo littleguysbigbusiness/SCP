@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Site Alarms // SCP Foundation{% endblock %}
+{% block title %}Alarms & Announcements // SCP Foundation{% endblock %}
 {% block content %}
-  <h1 class="page-title">Site Alarm Control</h1>
+  <h1 class="page-title">Alarms &amp; Announcements</h1>
   <p class="page-subtitle">
-    Set a site's security alert level. Changes broadcast to that site's Site Status screen
-    and are logged to Edit History.
+    Set a site's security alert level, or broadcast a message. Both show up on that site's
+    Site Status screen and are logged to Edit History.
   </p>
 
   {% if error %}
@@ -17,7 +17,7 @@
         <tr>
           <th>Site</th>
           <th>Current Level</th>
-          <th>Message</th>
+          <th>Latest Announcement</th>
           <th>Updated By</th>
           <th>Updated At</th>
           <th>Actions</th>
@@ -28,7 +28,13 @@
           <tr>
             <td>{{ s.site }}</td>
             <td><span class="alarm-chip alarm-level-{{ s.level }}">Level {{ s.level }}: {{ s.label }}</span></td>
-            <td>{{ s.message }}</td>
+            <td>
+              {% if s.latest_announcement %}
+                {{ s.latest_announcement.author }}: {{ s.latest_announcement.message }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
             <td>{{ s.updated_by }}</td>
             <td>{{ s.updated_at }}</td>
             <td><a href="{{ url_for('site_status', site=s.site) }}" target="_blank" rel="noopener">Preview</a></td>
@@ -42,7 +48,7 @@
 
   <section class="add-form">
     <h2>Set Alert Level</h2>
-    <form method="post" id="alarm-form">
+    <form method="post" action="{{ url_for('alarms') }}" id="alarm-form">
       <div class="form-grid">
         <label>
           Site
@@ -78,6 +84,73 @@
 
       <button type="submit">Set Alert Level</button>
     </form>
+  </section>
+
+  <section class="add-form">
+    <h2>Broadcast an Announcement</h2>
+    <p class="page-subtitle">
+      A message alone is fine, or add a countdown and/or an image - an image takes over the
+      whole Site Status screen until the next announcement replaces it.
+    </p>
+    <form method="post" action="{{ url_for('announcements') }}" enctype="multipart/form-data">
+      <div class="form-grid">
+        <label>
+          Site
+          <select name="Site">
+            <option value="{{ all_sites_label }}">{{ all_sites_label }}</option>
+            {% for s in known_sites %}
+              <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Countdown (minutes, optional)
+          <input type="number" name="CountdownMinutes" min="0" step="0.5" placeholder="e.g. 10">
+        </label>
+      </div>
+      <div class="form-grid">
+        <label>
+          Message
+          <textarea name="Message" rows="3"></textarea>
+        </label>
+      </div>
+      <div class="form-grid">
+        <label>
+          Image URL (optional)
+          <input type="url" name="ImageUrl" placeholder="https://...">
+        </label>
+        <label>
+          Or upload an image (optional)
+          <input type="file" name="Image" accept="image/*">
+        </label>
+      </div>
+      <button type="submit">Broadcast</button>
+    </form>
+  </section>
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Site</th>
+          <th>Message</th>
+          <th>Author</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent_announcements %}
+          <tr>
+            <td>{{ r.get('Timestamp', '') }}</td>
+            <td>{{ r.get('Site', '') }}</td>
+            <td>{{ r.get('Message', '') }}</td>
+            <td>{{ r.get('Author', '') }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty-row">No announcements on file.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </section>
 
   <script>

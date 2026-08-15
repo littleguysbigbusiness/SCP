@@ -140,6 +140,7 @@ def _warhead_state(site):
         status = "safe"
 
     detonate_at = (row.get("Detonate At") if row else "") or ""
+    show_countdown = str(row.get("Show Countdown", "Yes") if row else "Yes").strip().lower() != "no"
     seconds_left = None
 
     if status == "armed" and detonate_at:
@@ -155,7 +156,9 @@ def _warhead_state(site):
                 # Lazily persist the transition the first time anyone reads
                 # it after the countdown elapses - there's no background job,
                 # so "has it detonated yet" is computed on read.
-                sc.set_warhead(site, "detonated", row.get("Armed By", ""), row.get("Armed At", ""), detonate_at)
+                sc.set_warhead(
+                    site, "detonated", row.get("Armed By", ""), row.get("Armed At", ""), detonate_at, show_countdown
+                )
 
     return {
         "site": site,
@@ -164,6 +167,7 @@ def _warhead_state(site):
         "armed_at": (row.get("Armed At") if row else "") or "",
         "detonate_at": detonate_at,
         "seconds_left": seconds_left,
+        "show_countdown": show_countdown,
     }
 
 
@@ -171,12 +175,27 @@ ANNOUNCEMENT_ALL_SITES = "All Sites"
 
 
 def _announcement_payload(row):
+    countdown = row.get("Countdown Seconds", "")
+    countdown_seconds = int(countdown) if str(countdown).isdigit() else None
+    seconds_left = None
+    if countdown_seconds is not None:
+        try:
+            posted_at = datetime.fromisoformat(row.get("Timestamp", ""))
+        except ValueError:
+            posted_at = None
+        if posted_at is not None:
+            elapsed = (datetime.now(timezone.utc) - posted_at).total_seconds()
+            seconds_left = max(0, int(countdown_seconds - elapsed))
+
     return {
         "id": row.get("ID", ""),
         "message": row.get("Message", ""),
         "author": row.get("Author", ""),
         "timestamp": row.get("Timestamp", ""),
         "site": row.get("Site", ""),
+        "countdown_seconds": countdown_seconds,
+        "seconds_left": seconds_left,
+        "image_url": row.get("Image URL", "") or None,
     }
 
 
@@ -547,14 +566,25 @@ def alarms():
     error = None
     known_sites = []
     statuses = []
+    recent_announcements = []
     try:
         known_sites = _known_sites()
         statuses = [_site_alarm_state(site) for site in known_sites]
+        for s in statuses:
+            latest = _recent_announcements(s["site"], limit=1)
+            s["latest_announcement"] = latest[0] if latest else None
+        recent_announcements = sc.get_rows("announcements")[-15:][::-1]
     except Exception as exc:
         error = str(exc)
 
     return render_template(
-        "alarms.html", statuses=statuses, levels=ALARM_LEVELS, known_sites=known_sites, error=error
+        "alarms.html",
+        statuses=statuses,
+        levels=ALARM_LEVELS,
+        known_sites=known_sites,
+        error=error,
+        recent_announcements=recent_announcements,
+        all_sites_label=ANNOUNCEMENT_ALL_SITES,
     )
 
 
@@ -578,15 +608,18 @@ def warhead():
         action = request.form.get("action", "")
 
         if site and action == "arm":
+            show_countdown = request.form.get("ShowCountdown") == "on"
             timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
             detonate_at = (datetime.now(timezone.utc) + timedelta(seconds=WARHEAD_ARM_SECONDS)).isoformat(
                 timespec="seconds"
             )
-            sc.set_warhead(site, "armed", session.get("staff_name", ""), timestamp, detonate_at)
+            sc.set_warhead(site, "armed", session.get("staff_name", ""), timestamp, detonate_at, show_countdown)
             _log_change(
                 "Warhead",
                 site,
-                'Status: "safe" -> "armed" (detonates in {}:00)'.format(WARHEAD_ARM_SECONDS // 60),
+                'Status: "safe" -> "armed" (detonates in {}:00, countdown {})'.format(
+                    WARHEAD_ARM_SECONDS // 60, "shown" if show_countdown else "hidden"
+                ),
             )
             # Arming is a last-resort action - force the site's alarm to
             # Evacuation too, same as a real containment-breach protocol would.
@@ -672,10 +705,30 @@ def site_status_data():
 
 @app.route("/announcements", methods=["GET", "POST"])
 def announcements():
+    # Merged into the /alarms page as a single combined Alarms/Announcements
+    # section - this route just handles the POST (its form posts here) and
+    # redirects GET for anyone with an old link.
     if request.method == "POST":
         site = request.form.get("Site", "").strip() or ANNOUNCEMENT_ALL_SITES
         message = request.form.get("Message", "").strip()
-        if message:
+
+        countdown_minutes = request.form.get("CountdownMinutes", "").strip()
+        countdown_seconds = ""
+        if countdown_minutes:
+            try:
+                countdown_seconds = str(int(float(countdown_minutes) * 60))
+            except ValueError:
+                countdown_seconds = ""
+
+        image_url = request.form.get("ImageUrl", "").strip()
+        image_file = request.files.get("Image")
+        if image_file and image_file.filename:
+            try:
+                image_url = drive_client.upload_image(image_file)
+            except Exception:
+                pass  # fall back to whatever pasted URL (if any) - don't block the broadcast on an upload failure
+
+        if message or image_url:
             sc.add_row(
                 "announcements",
                 {
@@ -688,26 +741,11 @@ def announcements():
                     "Site": site,
                     "Message": message,
                     "Author": session.get("staff_name", ""),
+                    "Countdown Seconds": countdown_seconds,
+                    "Image URL": image_url,
                 },
             )
-        return redirect(url_for("announcements"))
-
-    error = None
-    rows = []
-    known_sites = []
-    try:
-        rows = list(reversed(sc.get_rows("announcements")))
-        known_sites = _known_sites()
-    except Exception as exc:
-        error = str(exc)
-
-    return render_template(
-        "announcements.html",
-        rows=rows,
-        known_sites=known_sites,
-        error=error,
-        all_sites_label=ANNOUNCEMENT_ALL_SITES,
-    )
+    return redirect(url_for("alarms"))
 
 
 @app.route("/comms", methods=["GET", "POST"])

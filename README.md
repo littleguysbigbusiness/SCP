@@ -27,7 +27,8 @@ matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" 
 director" (case-insensitive substring match):
 
 - **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Class-D
-  Records, Test Logs, Print, Edit History, Alarms, Announcements, Warhead, Site Status.
+  Records, Test Logs, Print, Edit History, Alarms (includes Announcements), Warhead, Site
+  Status.
 - **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
   page. Any other URL redirects there.
 
@@ -252,12 +253,32 @@ Seven levels, escalating severity (`ALARM_LEVELS` in `app.py`):
 
 A separate, freeform broadcast channel from the alarm level itself — for messages that
 aren't tied to changing a site's security state. Lives in its own `Announcements` Sheet tab
-(`ID`, `Timestamp`, `Site`, `Message`, `Author`), an append-only log rather than the
-one-row-per-site upsert that Site Alarms uses.
+(`ID`, `Timestamp`, `Site`, `Message`, `Author`, `Countdown Seconds`, `Image URL`), an
+append-only log rather than the one-row-per-site upsert that Site Alarms uses.
 
-- **`/announcements`** (privileged-only, linked as "Announcements") — a form to broadcast a
-  message to one specific site, or to `"All Sites"` for a Foundation-wide message, plus a
-  history table of everything sent.
+An announcement can optionally carry a countdown and/or an image, on top of the message:
+
+- **Countdown** — the broadcast form takes minutes, stored as `Countdown Seconds`; like the
+  warhead, remaining time is computed live from `Countdown Seconds` minus elapsed time since
+  `Timestamp` (`_announcement_payload()`), not stored as a fixed target, so it's always
+  correct on read. Shows as a ticking banner on Site Status.
+- **Image** — either paste a URL or upload a file (both routes are supported; an upload
+  takes priority if both are given). An uploaded file goes through
+  `drive_client.upload_image()`, a sibling of the Archives scan uploader that returns a
+  directly-embeddable `drive.google.com/uc?export=view&id=...` URL instead of
+  `upload_scan()`'s human-facing viewer-page link — the wrong kind of link for an `<img src>`.
+  When the latest announcement for a site has an image, it takes over the *entire* Site
+  Status screen (all other content hidden) until a newer announcement replaces it - same
+  precedence tier as a warhead detonation, which still wins if both are active at once.
+  A message alone (no image) is enough to post - image and countdown are both optional, and
+  a message is optional too as long as one of the other two is present.
+
+- **`/alarms`** (privileged-only, linked as "Alarms") is a single combined Alarms +
+  Announcements page: the level picker, an announcement broadcast form, one overview table
+  showing each site's current level *and* latest announcement, and a recent-announcements
+  history table. `/announcements` still exists as the POST target for that form (and
+  redirects GET requests back to `/alarms` for anyone with an old link) but there's no
+  separate page for it anymore.
 - Shows up on the Site Status screen for any matching site (that exact site, or an "All
   Sites" post): a new one slides in as a temporary popup card and gets read aloud via the
   same `SpeechSynthesis` mechanism, then after a few seconds settles into a persistent "Site
@@ -273,27 +294,37 @@ one-row-per-site upsert that Site Alarms uses.
 ## Warhead
 
 A per-site self-destruct, absolute last resort, in its own `Warheads` Sheet tab (`Site`,
-`Status`, `Armed By`, `Armed At`, `Detonate At`) upserted the same way as Site Alarms - one
-live row per site (`sheets_client.set_warhead()`, sharing the `_upsert_by_column()` helper
-that `set_site_alarm()` also uses now).
+`Status`, `Armed By`, `Armed At`, `Detonate At`, `Show Countdown`) upserted the same way as
+Site Alarms - one live row per site (`sheets_client.set_warhead()`, sharing the
+`_upsert_by_column()` helper that `set_site_alarm()` also uses now).
 
 - **`/warhead`** (privileged-only, linked as "Warhead") — arming requires turning both "KEY
   1" and "KEY 2" toggle buttons before the red "Arm Warhead" button becomes clickable (a
   client-side gate for the classic two-key launch feel; the real security boundary is still
-  the privileged-only route). Arming a site forces its alarm to Level 7 Evacuation and starts
-  a 5-minute countdown (`WARHEAD_ARM_SECONDS`), all logged to Edit History. Any O5/Site
+  the privileged-only route). A "Display countdown banner on Site Status screen" checkbox
+  (checked by default) controls `Show Countdown` — uncheck it to arm silently, still forcing
+  Level 7 and still detonating on schedule, just without the visible/audible countdown on
+  that site's screen. Arming forces the site's alarm to Level 7 Evacuation and starts a
+  5-minute countdown (`WARHEAD_ARM_SECONDS`), all logged to Edit History. Any O5/Site
   Director can Disarm an armed site before it reaches zero, or Reset a detonated one back to
   Safe. Each row also has a "Broadcast to TV Screens" link that opens that site's Site Status
   in a new tab.
 - There's no background job - whether the countdown has reached zero is computed lazily
   whenever a site's warhead state is read (`_warhead_state()`), and the "detonated"
   transition is written back to the sheet at that point so it sticks from then on.
-- Site Status reflects it live: while armed, a flashing countdown banner sits above the
-  normal alarm panel and a synthesized square-wave beep (Web Audio API `OscillatorNode`, no
-  audio file) ticks once per second, gated behind the same "Enable Alarm Audio" button as the
-  alarm-level sounds. On detonation, the whole screen swaps to a black "SITE DESTROYED" end
-  state, announced via `SpeechSynthesis`, picked up automatically by the existing 12-second
+- Site Status reflects it live: while armed (and `Show Countdown` is on), a flashing
+  countdown card sits inside the alarm panel itself — nested there specifically so it's still
+  visible in fullscreen, along with everything else on the page (see below) — and a
+  synthesized square-wave beep (Web Audio API `OscillatorNode`, no audio file) ticks once per
+  second, gated behind the same "Enable Alarm Audio" button as the alarm-level sounds. On
+  detonation, the whole screen swaps to a black "SITE DESTROYED" end state, announced via
+  `SpeechSynthesis`, picked up automatically by the existing 12-second
   poll without needing a page reload.
+- The Fullscreen button targets a wrapping `#status-root` div around the whole screen (alarm
+  panel, destroyed-screen, and the announcement popup), not just the alarm panel itself -
+  the Fullscreen API only shows the fullscreened element's own subtree, so anything outside
+  it (the countdown banner used to be a sibling, not a child) would otherwise vanish the
+  moment the screen goes fullscreen.
 
 ## Staff Lookup
 

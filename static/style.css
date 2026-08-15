@@ -603,8 +603,8 @@ button:hover { background: var(--accent); color: var(--bg); }
   font-weight: bold;
 }
 
-body:fullscreen .alarm-status-controls,
-#alarm-screen:fullscreen .alarm-status-controls { display: none; }
+#status-root:fullscreen .alarm-status-controls { display: none; }
+#status-root:fullscreen { display: flex; flex-direction: column; }
 
 /* Warhead control panel */
 
@@ -619,6 +619,17 @@ body:fullscreen .alarm-status-controls,
   font-variant-numeric: tabular-nums;
   color: var(--danger);
   font-weight: bold;
+}
+
+.checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  margin: 1rem 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
 }
 
 .key-panel {
@@ -685,9 +696,10 @@ body:fullscreen .alarm-status-controls,
 
 .warhead-banner {
   width: 100%;
-  max-width: 50rem;
+  max-width: 32rem;
   background: #2a0a0a;
   border: 2px solid var(--danger);
+  border-radius: 6px;
   color: #ff8a7a;
   padding: 0.8rem 1.5rem;
   text-align: center;
@@ -695,7 +707,12 @@ body:fullscreen .alarm-status-controls,
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
-  animation: alarm-flash 0.8s steps(1) infinite;
+  animation: alarm-flash 0.8s steps(1) infinite, warhead-banner-in 0.4s ease;
+}
+
+@keyframes warhead-banner-in {
+  from { transform: translateY(-1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .warhead-destroyed-screen {
@@ -715,6 +732,53 @@ body:fullscreen .alarm-status-controls,
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: bold;
   letter-spacing: 0.1em;
+}
+
+.announcement-banner {
+  width: 100%;
+  max-width: 32rem;
+  background: rgba(201, 161, 59, 0.15);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 0.8rem 1.5rem;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  animation: warhead-banner-in 0.4s ease;
+}
+
+.announcement-image-screen {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  position: relative;
+  padding: 1.5rem;
+}
+
+.announcement-image-screen img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.announcement-image-caption {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(13, 14, 16, 0.85);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  color: var(--text);
+  text-align: center;
+  max-width: 80%;
 }
 
 .hidden { display: none !important; }

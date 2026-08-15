@@ -21,67 +21,79 @@
   {% elif not state %}
     <div class="alert">No sites on file yet - add a Site value to a Staff record, or set an alert level for one from the Alarms page.</div>
   {% else %}
-    <div class="warhead-destroyed-screen {% if not (warhead and warhead.status == 'detonated') %}hidden{% endif %}" id="warhead-destroyed-screen">
-      <div class="destroyed-label">SITE {{ selected_site }}: DESTROYED</div>
-      <div>Warhead detonation confirmed. All containment lost.</div>
-    </div>
-
-    <div id="normal-status-wrap" {% if warhead and warhead.status == 'detonated' %}class="hidden"{% endif %}>
-      <div class="warhead-banner {% if not (warhead and warhead.status == 'armed') %}hidden{% endif %}" id="warhead-banner">
-        &#9888; WARHEAD ARMED — DETONATION IN <span id="warhead-countdown">--:--</span> &#9888;
+    <div id="status-root">
+      <div class="warhead-destroyed-screen hidden" id="warhead-destroyed-screen">
+        <div class="destroyed-label">SITE {{ selected_site }}: DESTROYED</div>
+        <div>Warhead detonation confirmed. All containment lost.</div>
       </div>
 
-      <div
-        class="alarm-status-screen alarm-level-{{ state.level }} alarm-tier-{{ state.tier }}"
-        id="alarm-screen"
-        data-site="{{ selected_site }}"
-      >
-        <div class="alarm-status-site">SITE {{ selected_site }}</div>
-        <div class="alarm-status-label" id="alarm-label">LEVEL {{ state.level }}: {{ state.label }}</div>
-        <div class="alarm-status-desc" id="alarm-desc">{{ state.description }}</div>
-        <div class="alarm-status-message" id="alarm-message" {% if not state.message %}style="display:none;"{% endif %}>
-          {{ state.message }}
-        </div>
-
-        <div class="alarm-status-panels">
-          <div class="status-panel">
-            <h3>Site Broadcast</h3>
-            <ul class="status-list" id="announcement-list">
-              {% for a in announcements %}
-                <li data-id="{{ a.id }}"><span>{{ a.author }}: {{ a.message }}</span><span class="status-time" data-timestamp="{{ a.timestamp }}"></span></li>
-              {% else %}
-                <li class="status-empty">No announcements yet.</li>
-              {% endfor %}
-            </ul>
-          </div>
-          <div class="status-panel">
-            <h3>Alarm History</h3>
-            <ul class="status-list" id="alarm-history-list">
-              {% for h in alarm_history %}
-                <li><span>{{ h.label }}</span><span class="status-time" data-timestamp="{{ h.timestamp }}"></span></li>
-              {% else %}
-                <li class="status-empty">No level changes yet.</li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-
-        <div class="alarm-status-controls" id="status-controls">
-          <button type="button" id="fullscreen-btn">Fullscreen</button>
-          <button type="button" id="speak-btn">Repeat Announcement</button>
-          <button type="button" id="sound-btn">Enable Alarm Audio</button>
-        </div>
-        <audio id="alarm-audio" loop></audio>
+      <div class="announcement-image-screen hidden" id="announcement-image-screen">
+        <img id="announcement-image" src="" alt="Site broadcast image">
+        <div class="announcement-image-caption hidden" id="announcement-image-caption"></div>
       </div>
-    </div>
 
-    <div class="announcement-popup" id="announcement-popup">
-      <div class="popup-author" id="popup-author"></div>
-      <div class="popup-message" id="popup-message"></div>
+      <div id="normal-status-wrap">
+        <div
+          class="alarm-status-screen alarm-level-{{ state.level }} alarm-tier-{{ state.tier }}"
+          id="alarm-screen"
+          data-site="{{ selected_site }}"
+        >
+          <div class="warhead-banner {% if not (warhead and warhead.status == 'armed' and warhead.show_countdown) %}hidden{% endif %}" id="warhead-banner">
+            &#9888; WARHEAD ARMED — DETONATION IN <span id="warhead-countdown">--:--</span> &#9888;
+          </div>
+
+          <div class="announcement-banner hidden" id="announcement-banner">
+            <span id="announcement-banner-text"></span>
+          </div>
+
+          <div class="alarm-status-site">SITE {{ selected_site }}</div>
+          <div class="alarm-status-label" id="alarm-label">LEVEL {{ state.level }}: {{ state.label }}</div>
+          <div class="alarm-status-desc" id="alarm-desc">{{ state.description }}</div>
+          <div class="alarm-status-message" id="alarm-message" {% if not state.message %}style="display:none;"{% endif %}>
+            {{ state.message }}
+          </div>
+
+          <div class="alarm-status-panels">
+            <div class="status-panel">
+              <h3>Site Broadcast</h3>
+              <ul class="status-list" id="announcement-list">
+                {% for a in announcements %}
+                  <li data-id="{{ a.id }}"><span>{{ a.author }}: {{ a.message }}</span><span class="status-time" data-timestamp="{{ a.timestamp }}"></span></li>
+                {% else %}
+                  <li class="status-empty">No announcements yet.</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="status-panel">
+              <h3>Alarm History</h3>
+              <ul class="status-list" id="alarm-history-list">
+                {% for h in alarm_history %}
+                  <li><span>{{ h.label }}</span><span class="status-time" data-timestamp="{{ h.timestamp }}"></span></li>
+                {% else %}
+                  <li class="status-empty">No level changes yet.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+
+          <div class="alarm-status-controls" id="status-controls">
+            <button type="button" id="fullscreen-btn">Fullscreen</button>
+            <button type="button" id="speak-btn">Repeat Announcement</button>
+            <button type="button" id="sound-btn">Enable Alarm Audio</button>
+          </div>
+          <audio id="alarm-audio" loop></audio>
+        </div>
+      </div>
+
+      <div class="announcement-popup" id="announcement-popup">
+        <div class="popup-author" id="popup-author"></div>
+        <div class="popup-message" id="popup-message"></div>
+      </div>
     </div>
 
     <script>
       (function () {
+        var rootEl = document.getElementById('status-root');
         var screenEl = document.getElementById('alarm-screen');
         var site = screenEl.dataset.site;
         var labelEl = document.getElementById('alarm-label');
@@ -97,13 +109,19 @@
         var soundBtn = document.getElementById('sound-btn');
         var audioEl = document.getElementById('alarm-audio');
         var destroyedScreenEl = document.getElementById('warhead-destroyed-screen');
+        var imageScreenEl = document.getElementById('announcement-image-screen');
+        var imageEl = document.getElementById('announcement-image');
+        var imageCaptionEl = document.getElementById('announcement-image-caption');
         var normalWrapEl = document.getElementById('normal-status-wrap');
         var warheadBannerEl = document.getElementById('warhead-banner');
         var warheadCountdownEl = document.getElementById('warhead-countdown');
+        var announcementBannerEl = document.getElementById('announcement-banner');
+        var announcementBannerTextEl = document.getElementById('announcement-banner-text');
         var soundBase = {{ url_for('static', filename='assets/alarms/')|tojson }};
         var soundEnabled = false;
         var popupTimer = null;
         var warheadTickTimer = null;
+        var announcementTickTimer = null;
         var audioCtx = null;
 
         var current = {
@@ -215,7 +233,9 @@
         }
 
         function renderAnnouncements(list) {
-          renderList(announcementListEl, list, function (a) { return a.author + ': ' + a.message; });
+          renderList(announcementListEl, list, function (a) {
+            return a.author + ': ' + (a.message || (a.image_url ? '[Image posted]' : ''));
+          });
         }
 
         function renderAlarmHistory(list) {
@@ -247,20 +267,36 @@
           }
         }
 
+        // Exactly one of these three is ever shown - decided together so a
+        // detonation and an image takeover can never both toggle "visible"
+        // out of sync with each other.
+        function updateScreenMode() {
+          var w = current.warhead;
+          var latest = current.announcements.length ? current.announcements[0] : null;
+          var detonated = w && w.status === 'detonated';
+          var hasImage = !detonated && latest && latest.image_url;
+
+          destroyedScreenEl.classList.toggle('hidden', !detonated);
+          imageScreenEl.classList.toggle('hidden', !hasImage);
+          normalWrapEl.classList.toggle('hidden', detonated || hasImage);
+
+          if (detonated) { audioEl.pause(); }
+
+          if (hasImage) {
+            imageEl.src = latest.image_url;
+            if (latest.message) {
+              imageCaptionEl.textContent = latest.author + ': ' + latest.message;
+              imageCaptionEl.classList.remove('hidden');
+            } else {
+              imageCaptionEl.classList.add('hidden');
+            }
+          }
+        }
+
         function applyWarhead(w) {
           if (warheadTickTimer) { clearInterval(warheadTickTimer); warheadTickTimer = null; }
 
-          if (w && w.status === 'detonated') {
-            destroyedScreenEl.classList.remove('hidden');
-            normalWrapEl.classList.add('hidden');
-            audioEl.pause();
-            return;
-          }
-
-          destroyedScreenEl.classList.add('hidden');
-          normalWrapEl.classList.remove('hidden');
-
-          if (w && w.status === 'armed') {
+          if (w && w.status === 'armed' && w.show_countdown) {
             warheadBannerEl.classList.remove('hidden');
             var seconds = w.seconds_left;
             warheadCountdownEl.textContent = formatCountdown(seconds);
@@ -274,11 +310,28 @@
           }
         }
 
+        function applyAnnouncementCountdown(latest) {
+          if (announcementTickTimer) { clearInterval(announcementTickTimer); announcementTickTimer = null; }
+
+          if (latest && latest.countdown_seconds != null && latest.seconds_left != null) {
+            announcementBannerEl.classList.remove('hidden');
+            var seconds = latest.seconds_left;
+            var label = latest.message || 'Countdown';
+            announcementBannerTextEl.textContent = label + ' — ' + formatCountdown(seconds);
+            announcementTickTimer = setInterval(function () {
+              seconds = Math.max(0, seconds - 1);
+              announcementBannerTextEl.textContent = label + ' — ' + formatCountdown(seconds);
+            }, 1000);
+          } else {
+            announcementBannerEl.classList.add('hidden');
+          }
+        }
+
         fullscreenBtn.addEventListener('click', function () {
           if (document.fullscreenElement) {
             document.exitFullscreen();
           } else {
-            screenEl.requestFullscreen();
+            rootEl.requestFullscreen();
           }
         });
 
@@ -298,7 +351,9 @@
 
         announceAlarm(current);
         playAlarmSound(current.sound);
+        updateScreenMode();
         applyWarhead(current.warhead);
+        applyAnnouncementCountdown(current.announcements.length ? current.announcements[0] : null);
 
         setInterval(function () {
           fetch('{{ url_for("site_status_data") }}?site=' + encodeURIComponent(site))
@@ -318,9 +373,12 @@
               var newest = data.announcements.length ? data.announcements[0] : null;
               var lastSeenId = current.announcements.length ? current.announcements[0].id : null;
               if (newest && newest.id !== lastSeenId) {
-                showPopup(newest);
+                // An image takeover IS the announcement - no need for the
+                // small popup on top of it, but still list-transition delay
+                // for the "moves to the list" effect on text-only ones.
+                if (!newest.image_url) { showPopup(newest); }
                 announceMessage(newest);
-                setTimeout(function () { renderAnnouncements(data.announcements); }, 7000);
+                setTimeout(function () { renderAnnouncements(data.announcements); }, newest.image_url ? 0 : 7000);
               } else {
                 renderAnnouncements(data.announcements);
               }
@@ -336,14 +394,14 @@
                   speak('Warning. Site ' + site + ' warhead is armed. Evacuate immediately.');
                 }
               }
-              if (newWarheadStatus === 'armed' || newWarheadStatus !== oldWarheadStatus) {
-                // Re-applying on every poll (not just on change) resyncs the
-                // local countdown/beep ticker with the server's seconds_left,
-                // correcting for any client-side timer drift.
-                applyWarhead(data.warhead);
-              }
 
               current = data;
+              // Re-applying on every poll (not just on change) resyncs the
+              // local countdown/beep tickers with the server's seconds_left,
+              // correcting for any client-side timer drift.
+              updateScreenMode();
+              applyWarhead(data.warhead);
+              applyAnnouncementCountdown(newest);
             })
             .catch(function () {});
         }, 12000);

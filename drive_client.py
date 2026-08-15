@@ -17,7 +17,7 @@ def get_service():
     return _service
 
 
-def upload_scan(file_storage):
+def _upload_file(file_storage, name_prefix):
     # Service accounts have no Drive storage quota of their own, so the file
     # has to land in a folder a real Google account owns and has shared with
     # the service account (Editor) - that folder's quota is what's used.
@@ -25,7 +25,7 @@ def upload_scan(file_storage):
     if not folder_id:
         raise RuntimeError("GOOGLE_DRIVE_FOLDER_ID env var is not set")
 
-    filename = file_storage.filename or "scan-{}".format(uuid.uuid4().hex[:8])
+    filename = file_storage.filename or "{}-{}".format(name_prefix, uuid.uuid4().hex[:8])
     mimetype = file_storage.mimetype or "application/octet-stream"
     media = MediaIoBaseUpload(file_storage.stream, mimetype=mimetype, resumable=False)
 
@@ -42,5 +42,18 @@ def upload_scan(file_storage):
 
     file_id = created["id"]
     service.permissions().create(fileId=file_id, body={"type": "anyone", "role": "reader"}).execute()
+    return created
 
+
+def upload_scan(file_storage):
+    created = _upload_file(file_storage, "scan")
+    file_id = created["id"]
     return created.get("webViewLink") or "https://drive.google.com/file/d/{}/view".format(file_id)
+
+
+def upload_image(file_storage):
+    # unlike upload_scan's webViewLink (an HTML viewer page - wrong for an
+    # <img src>), this returns a URL that serves the raw image bytes
+    # directly, suitable for embedding as a full-screen takeover.
+    created = _upload_file(file_storage, "image")
+    return "https://drive.google.com/uc?export=view&id={}".format(created["id"])

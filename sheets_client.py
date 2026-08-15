@@ -71,11 +71,11 @@ TABS = {
     },
     "announcements": {
         "title": "Announcements",
-        "headers": ["ID", "Timestamp", "Site", "Message", "Author"],
+        "headers": ["ID", "Timestamp", "Site", "Message", "Author", "Countdown Seconds", "Image URL"],
     },
     "warheads": {
         "title": "Warheads",
-        "headers": ["Site", "Status", "Armed By", "Armed At", "Detonate At"],
+        "headers": ["Site", "Status", "Armed By", "Armed At", "Detonate At", "Show Countdown"],
     },
 }
 
@@ -224,10 +224,17 @@ def set_site_alarm(site, level, message, updated_by, updated_at):
     )
 
 
-def set_warhead(site, status, armed_by, armed_at, detonate_at):
+def set_warhead(site, status, armed_by, armed_at, detonate_at, show_countdown=True):
     return _upsert_by_column(
         "warheads",
         "Site",
         site,
-        {"Site": site, "Status": status, "Armed By": armed_by, "Armed At": armed_at, "Detonate At": detonate_at},
+        {
+            "Site": site,
+            "Status": status,
+            "Armed By": armed_by,
+            "Armed At": armed_at,
+            "Detonate At": detonate_at,
+            "Show Countdown": "Yes" if show_countdown else "No",
+        },
     )
