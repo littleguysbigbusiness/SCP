@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -126,17 +127,7 @@ def _site_alarm_state(site):
 ANNOUNCEMENT_ALL_SITES = "All Sites"
 
 
-def _latest_announcement(site):
-    if not site:
-        return None
-    rows = sc.get_rows("announcements")
-    relevant = [r for r in rows if str(r.get("Site", "")) in (site, ANNOUNCEMENT_ALL_SITES)]
-    return relevant[-1] if relevant else None
-
-
 def _announcement_payload(row):
-    if not row:
-        return None
     return {
         "id": row.get("ID", ""),
         "message": row.get("Message", ""),
@@ -144,6 +135,44 @@ def _announcement_payload(row):
         "timestamp": row.get("Timestamp", ""),
         "site": row.get("Site", ""),
     }
+
+
+def _recent_announcements(site, limit=5):
+    """Newest-first announcements for a site (its own posts plus any
+    Foundation-wide "All Sites" broadcasts), capped at `limit`."""
+    if not site:
+        return []
+    rows = sc.get_rows("announcements")
+    relevant = [r for r in rows if str(r.get("Site", "")) in (site, ANNOUNCEMENT_ALL_SITES)]
+    return [_announcement_payload(r) for r in reversed(relevant[-limit:])]
+
+
+# Pulls just the new level's label out of an Edit History diff line like
+# 'Level: "Normal Protocol" -> "6: CI Raid"; Message: "" -> "..."' so the
+# Site Status alarm history reads as a clean label instead of a raw diff.
+_LEVEL_CHANGE_RE = re.compile(r'Level: ".*?" -> "\d+: (.*?)"')
+
+
+def _alarm_history(site, limit=6):
+    """Newest-first log of level changes for a site, from Edit History."""
+    if not site:
+        return []
+    rows = sc.get_rows("edit_history")
+    relevant = [
+        r for r in rows if r.get("Tab") == "Site Alarms" and str(r.get("Record ID", "")) == str(site)
+    ]
+    history = []
+    for r in reversed(relevant[-limit:]):
+        changes = r.get("Changes", "")
+        match = _LEVEL_CHANGE_RE.search(changes)
+        history.append(
+            {
+                "label": match.group(1) if match else changes,
+                "timestamp": r.get("Timestamp", ""),
+                "editor": r.get("Editor", ""),
+            }
+        )
+    return history
 
 
 @app.template_filter("class_tag")
@@ -492,20 +521,23 @@ def site_status():
     known_sites = []
     selected_site = ""
     state = None
-    announcement = None
+    announcements = []
+    alarm_history = []
     try:
         known_sites = _known_sites()
         selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
         if selected_site:
             state = _site_alarm_state(selected_site)
-            announcement = _announcement_payload(_latest_announcement(selected_site))
+            announcements = _recent_announcements(selected_site)
+            alarm_history = _alarm_history(selected_site)
     except Exception as exc:
         error = str(exc)
 
     return render_template(
         "site_status.html",
         state=state,
-        announcement=announcement,
+        announcements=announcements,
+        alarm_history=alarm_history,
         selected_site=selected_site,
         known_sites=known_sites,
         error=error,
@@ -521,7 +553,8 @@ def site_status_data():
 
     try:
         data = _site_alarm_state(selected_site)
-        data["announcement"] = _announcement_payload(_latest_announcement(selected_site))
+        data["announcements"] = _recent_announcements(selected_site)
+        data["alarm_history"] = _alarm_history(selected_site)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

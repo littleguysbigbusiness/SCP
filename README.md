@@ -259,11 +259,16 @@ one-row-per-site upsert that Site Alarms uses.
   message to one specific site, or to `"All Sites"` for a Foundation-wide message, plus a
   history table of everything sent.
 - Shows up on the Site Status screen for any matching site (that exact site, or an "All
-  Sites" post) below the alarm panel, and gets read aloud via the same `SpeechSynthesis`
-  mechanism the moment it appears. Each announcement gets a real generated `ID`
-  (`uuid.uuid4().hex[:12]`, unlike Role Comms/Test Logs which leave `ID` blank) because the
-  Site Status poller diffs on it to detect a genuinely new announcement — using `Timestamp`
-  for that would fail if two announcements land in the same second.
+  Sites" post): a new one slides in as a temporary popup card and gets read aloud via the
+  same `SpeechSynthesis` mechanism, then after a few seconds settles into a persistent "Site
+  Broadcast" list (last 5, newest first) alongside an "Alarm History" list of past level
+  changes for that site (pulled from Edit History, label extracted from the diff text via a
+  regex). Each announcement gets a real generated `ID` (`uuid.uuid4().hex[:12]`, unlike Role
+  Comms/Test Logs which leave `ID` blank) because the Site Status poller diffs on it to
+  detect a genuinely new announcement — using `Timestamp` for that would fail if two
+  announcements land in the same second. The control-button row (Fullscreen/Repeat
+  Announcement/Enable Alarm Audio) hides itself while the screen is in fullscreen, via the
+  CSS `:fullscreen` pseudo-class, so a wall-mounted display shows just the alert.
 
 ## Staff Lookup
 

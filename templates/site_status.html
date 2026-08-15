@@ -32,15 +32,41 @@
       <div class="alarm-status-message" id="alarm-message" {% if not state.message %}style="display:none;"{% endif %}>
         {{ state.message }}
       </div>
-      <div class="alarm-status-message" id="announcement-message" {% if not announcement %}style="display:none;"{% endif %}>
-        {% if announcement %}Announcement from {{ announcement.author }}: {{ announcement.message }}{% endif %}
+
+      <div class="alarm-status-panels">
+        <div class="status-panel">
+          <h3>Site Broadcast</h3>
+          <ul class="status-list" id="announcement-list">
+            {% for a in announcements %}
+              <li data-id="{{ a.id }}"><span>{{ a.author }}: {{ a.message }}</span><span class="status-time" data-timestamp="{{ a.timestamp }}"></span></li>
+            {% else %}
+              <li class="status-empty">No announcements yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="status-panel">
+          <h3>Alarm History</h3>
+          <ul class="status-list" id="alarm-history-list">
+            {% for h in alarm_history %}
+              <li><span>{{ h.label }}</span><span class="status-time" data-timestamp="{{ h.timestamp }}"></span></li>
+            {% else %}
+              <li class="status-empty">No level changes yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
       </div>
-      <div class="alarm-status-controls">
+
+      <div class="alarm-status-controls" id="status-controls">
         <button type="button" id="fullscreen-btn">Fullscreen</button>
         <button type="button" id="speak-btn">Repeat Announcement</button>
         <button type="button" id="sound-btn">Enable Alarm Audio</button>
       </div>
       <audio id="alarm-audio" loop></audio>
+    </div>
+
+    <div class="announcement-popup" id="announcement-popup">
+      <div class="popup-author" id="popup-author"></div>
+      <div class="popup-message" id="popup-message"></div>
     </div>
 
     <script>
@@ -50,13 +76,18 @@
         var labelEl = document.getElementById('alarm-label');
         var descEl = document.getElementById('alarm-desc');
         var messageEl = document.getElementById('alarm-message');
-        var announcementEl = document.getElementById('announcement-message');
+        var announcementListEl = document.getElementById('announcement-list');
+        var alarmHistoryListEl = document.getElementById('alarm-history-list');
+        var popupEl = document.getElementById('announcement-popup');
+        var popupAuthorEl = document.getElementById('popup-author');
+        var popupMessageEl = document.getElementById('popup-message');
         var fullscreenBtn = document.getElementById('fullscreen-btn');
         var speakBtn = document.getElementById('speak-btn');
         var soundBtn = document.getElementById('sound-btn');
         var audioEl = document.getElementById('alarm-audio');
         var soundBase = {{ url_for('static', filename='assets/alarms/')|tojson }};
         var soundEnabled = false;
+        var popupTimer = null;
 
         var current = {
           level: {{ state.level }},
@@ -65,8 +96,26 @@
           message: {{ state.message|tojson }},
           tier: {{ state.tier|tojson }},
           sound: {{ state.sound|tojson }},
-          announcement: {{ announcement|tojson }}
+          announcements: {{ announcements|tojson }},
+          alarm_history: {{ alarm_history|tojson }}
         };
+
+        function timeAgo(iso) {
+          if (!iso) return '';
+          var then = new Date(iso).getTime();
+          if (isNaN(then)) return '';
+          var diff = Math.max(0, Math.floor((Date.now() - then) / 1000));
+          if (diff < 60) return diff + 's ago';
+          if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+          if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+          return Math.floor(diff / 86400) + 'd ago';
+        }
+
+        function refreshTimes() {
+          document.querySelectorAll('.status-time[data-timestamp]').forEach(function (el) {
+            el.textContent = timeAgo(el.dataset.timestamp);
+          });
+        }
 
         function speak(text) {
           if (!('speechSynthesis' in window)) return;
@@ -99,13 +148,46 @@
           screenEl.className = 'alarm-status-screen alarm-level-' + data.level + ' alarm-tier-' + data.tier;
         }
 
-        function applyAnnouncement(a) {
-          if (a) {
-            announcementEl.textContent = 'Announcement from ' + a.author + ': ' + a.message;
-            announcementEl.style.display = '';
-          } else {
-            announcementEl.style.display = 'none';
+        function renderList(el, items, formatLabel) {
+          el.innerHTML = '';
+          if (!items.length) {
+            var empty = document.createElement('li');
+            empty.className = 'status-empty';
+            empty.textContent = 'Nothing yet.';
+            el.appendChild(empty);
+            return;
           }
+          items.forEach(function (item) {
+            var li = document.createElement('li');
+            if (item.id) { li.dataset.id = item.id; }
+            var labelEl = document.createElement('span');
+            labelEl.textContent = formatLabel(item);
+            var timeEl = document.createElement('span');
+            timeEl.className = 'status-time';
+            timeEl.dataset.timestamp = item.timestamp || '';
+            li.appendChild(labelEl);
+            li.appendChild(timeEl);
+            el.appendChild(li);
+          });
+          refreshTimes();
+        }
+
+        function renderAnnouncements(list) {
+          renderList(announcementListEl, list, function (a) { return a.author + ': ' + a.message; });
+        }
+
+        function renderAlarmHistory(list) {
+          renderList(alarmHistoryListEl, list, function (h) { return h.label; });
+        }
+
+        function showPopup(a) {
+          popupAuthorEl.textContent = 'Site Broadcast — ' + a.author;
+          popupMessageEl.textContent = a.message;
+          popupEl.classList.add('visible');
+          if (popupTimer) clearTimeout(popupTimer);
+          popupTimer = setTimeout(function () {
+            popupEl.classList.remove('visible');
+          }, 7000);
         }
 
         function playAlarmSound(filename) {
@@ -133,7 +215,7 @@
 
         speakBtn.addEventListener('click', function () {
           announceAlarm(current);
-          announceMessage(current.announcement);
+          if (current.announcements.length) { announceMessage(current.announcements[0]); }
         });
 
         soundBtn.addEventListener('click', function () {
@@ -142,8 +224,10 @@
           playAlarmSound(current.sound);
         });
 
+        refreshTimes();
+        setInterval(refreshTimes, 15000);
+
         announceAlarm(current);
-        announceMessage(current.announcement);
         playAlarmSound(current.sound);
 
         setInterval(function () {
@@ -161,12 +245,17 @@
                 playAlarmSound(data.sound);
               }
 
-              var newAnnouncementId = data.announcement ? data.announcement.id : null;
-              var oldAnnouncementId = current.announcement ? current.announcement.id : null;
-              if (newAnnouncementId !== oldAnnouncementId) {
-                applyAnnouncement(data.announcement);
-                announceMessage(data.announcement);
+              var newest = data.announcements.length ? data.announcements[0] : null;
+              var lastSeenId = current.announcements.length ? current.announcements[0].id : null;
+              if (newest && newest.id !== lastSeenId) {
+                showPopup(newest);
+                announceMessage(newest);
+                setTimeout(function () { renderAnnouncements(data.announcements); }, 7000);
+              } else {
+                renderAnnouncements(data.announcements);
               }
+
+              renderAlarmHistory(data.alarm_history);
 
               current = data;
             })

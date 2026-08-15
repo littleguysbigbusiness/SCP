@@ -505,3 +505,103 @@ button:hover { background: var(--accent); color: var(--bg); }
   flex-wrap: wrap;
   justify-content: center;
 }
+
+.alarm-status-panels {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 50rem;
+  text-align: left;
+}
+
+.status-panel {
+  flex: 1 1 18rem;
+  background: rgba(13, 14, 16, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  backdrop-filter: blur(2px);
+}
+
+.status-panel h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+
+.status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.status-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-list li:last-child { border-bottom: none; padding-bottom: 0; }
+
+.status-list .status-time {
+  opacity: 0.7;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+
+.status-empty {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.announcement-popup {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translate(-50%, -150%);
+  z-index: 1000;
+  width: min(28rem, 90vw);
+  background: rgba(13, 14, 16, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  text-align: left;
+  color: var(--text);
+  opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.announcement-popup.visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.announcement-popup .popup-author {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 0.3rem;
+}
+
+.announcement-popup .popup-message {
+  font-size: 1.05rem;
+  font-weight: bold;
+}
+
+body:fullscreen .alarm-status-controls,
+#alarm-screen:fullscreen .alarm-status-controls { display: none; }
