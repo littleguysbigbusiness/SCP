@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Site Status // SCP Foundation{% endblock %}
 {% block content %}
-  {% if privileged and known_sites %}
+  {% if known_sites %}
     <form method="get" class="add-form">
       <div class="form-grid">
         <label>
@@ -17,7 +17,7 @@
   {% endif %}
 
   {% if not state %}
-    <div class="alert">No site is on file for your account - contact your supervisor to get assigned to one.</div>
+    <div class="alert">No sites on file yet - add a Site value to a Staff record, or set an alert level for one from the Alarms page.</div>
   {% else %}
     <div
       class="alarm-status-screen alarm-level-{{ state.level }} alarm-tier-{{ state.tier }}"
@@ -36,7 +36,9 @@
       <div class="alarm-status-controls">
         <button type="button" id="fullscreen-btn">Fullscreen</button>
         <button type="button" id="speak-btn">Repeat Announcement</button>
+        <button type="button" id="sound-btn">Enable Alarm Audio</button>
       </div>
+      <audio id="alarm-audio" loop></audio>
     </div>
 
     <script>
@@ -49,6 +51,10 @@
         var announcementEl = document.getElementById('announcement-message');
         var fullscreenBtn = document.getElementById('fullscreen-btn');
         var speakBtn = document.getElementById('speak-btn');
+        var soundBtn = document.getElementById('sound-btn');
+        var audioEl = document.getElementById('alarm-audio');
+        var soundBase = {{ url_for('static', filename='assets/alarms/')|tojson }};
+        var soundEnabled = false;
 
         var current = {
           level: {{ state.level }},
@@ -56,6 +62,7 @@
           description: {{ state.description|tojson }},
           message: {{ state.message|tojson }},
           tier: {{ state.tier|tojson }},
+          sound: {{ state.sound|tojson }},
           announcement: {{ announcement|tojson }}
         };
 
@@ -99,6 +106,21 @@
           }
         }
 
+        function playAlarmSound(filename) {
+          if (!filename) {
+            audioEl.pause();
+            audioEl.removeAttribute('src');
+            return;
+          }
+          var url = soundBase + filename;
+          if (audioEl.getAttribute('src') !== url) {
+            audioEl.src = url;
+          }
+          if (soundEnabled) {
+            audioEl.play().catch(function () {});
+          }
+        }
+
         fullscreenBtn.addEventListener('click', function () {
           if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -112,8 +134,15 @@
           announceMessage(current.announcement);
         });
 
+        soundBtn.addEventListener('click', function () {
+          soundEnabled = true;
+          soundBtn.textContent = 'Alarm Audio: On';
+          playAlarmSound(current.sound);
+        });
+
         announceAlarm(current);
         announceMessage(current.announcement);
+        playAlarmSound(current.sound);
 
         setInterval(function () {
           fetch('{{ url_for("site_status_data") }}?site=' + encodeURIComponent(site))
@@ -124,6 +153,10 @@
               if (data.level !== current.level || data.message !== current.message) {
                 applyState(data);
                 announceAlarm(data);
+              }
+
+              if (data.level !== current.level) {
+                playAlarmSound(data.sound);
               }
 
               var newAnnouncementId = data.announcement ? data.announcement.id : null;

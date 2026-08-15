@@ -27,7 +27,7 @@ matched staff row's `Role`, `Role Rank`, and `Clearance Level` columns for "O5" 
 director" (case-insensitive substring match):
 
 - **O5 / Site Director** → full access: Dashboard, Archives, Staff, Communications, Class-D
-  Records, Test Logs, Print, Edit History.
+  Records, Test Logs, Print, Edit History, Alarms, Announcements, Site Status.
 - **Everyone else** → only **Staff Duties** (`/staff-duties`), a static duties reference
   page. Any other URL redirects there.
 
@@ -233,15 +233,20 @@ Seven levels, escalating severity (`ALARM_LEVELS` in `app.py`):
 - **`/alarms`** (privileged-only, linked as "Alarms") — control panel: an overview table of
   every known site's current level, and a form to set a site's level (type/select the site,
   click a color-coded level button, optional broadcast message, then "Set Alert Level").
-- **`/site-status`** (everyone, linked as "Site Status") — a fullscreen-friendly announcement
-  screen. Regular staff only ever see their own site (`session["staff_site"]`, set at login);
-  Site Directors and O5 get a site picker and can preview any site. The background color and
-  animation intensity scale with the tier (`calm` = static, `elevated` = slow pulse, `severe`
-  = fast pulse with glow, `critical` = hard flash). Uses the browser's built-in
+- **`/site-status`** (privileged-only, linked as "Site Status") — a fullscreen-friendly
+  announcement screen with a site picker, so Site Directors and O5 can preview any site. The
+  background color and animation intensity scale with the tier (`calm` = static, `elevated`
+  = slow pulse, `severe` = fast pulse with glow, `critical` = hard flash). Uses the browser's built-in
   `SpeechSynthesis` API to read the alert aloud on load and whenever it changes — no paid TTS
   service involved. A "Fullscreen" button uses the Fullscreen API for wall-mounted displays.
   The screen polls `/site-status/data` (JSON) every 12 seconds to pick up changes without a
   full reload.
+- Each level (2-7; level 1 is silent) has a looping alarm sound under
+  `static/assets/alarms/` (`level-2-5.mp3` shared by levels 2-5, `level-6.mp3`, `level-7.mp3`
+  — trimmed to a few minutes each so they're small enough to loop cleanly and to commit to
+  the repo). Browsers block audio autoplay without a user gesture, so it only starts after
+  clicking "Enable Alarm Audio" on the screen; after that it keeps looping and automatically
+  swaps to the new level's clip (or silence, for level 1) whenever the level changes.
 
 ## Announcements
 

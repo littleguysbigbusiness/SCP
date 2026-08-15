@@ -8,7 +8,7 @@ LOGIN_PASSWORD = os.environ.get("STAFF_LOGIN_PASSWORD", "123456")
 OPEN_ENDPOINTS = {"login", "static"}
 
 # Routes any logged-in staff member can reach, privileged or not.
-UNPRIVILEGED_ENDPOINTS = {"staff_duties", "logout", "role_comms", "site_status", "site_status_data"}
+UNPRIVILEGED_ENDPOINTS = {"staff_duties", "logout", "role_comms"}
 
 PRIVILEGED_KEYWORDS = ("o5", "site director")
 

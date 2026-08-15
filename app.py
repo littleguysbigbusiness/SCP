@@ -31,41 +31,50 @@ CLEARANCE_LEVEL_TAGS = {"0": "neutral", "1": "safe", "2": "blue", "3": "euclid",
 # "tier" drives how urgently the Site Status screen animates (see .alarm-tier-*
 # in style.css) - it escalates independently of the numeric level so e.g.
 # levels 2-3 read as equally "elevated" even though only one number is higher.
+# "sound" is a filename under static/assets/alarms/, looped on the Site Status
+# screen until the level changes; None (level 1) plays nothing.
 ALARM_LEVELS = {
     1: {
         "label": "Normal Protocol",
         "tier": "calm",
         "description": "Standard operations. No active threats. Continue routine duties.",
+        "sound": None,
     },
     2: {
         "label": "Minor SCP Breach",
         "tier": "elevated",
         "description": "A contained anomaly has breached containment. Non-essential personnel remain clear of the affected wing.",
+        "sound": "level-2-5.mp3",
     },
     3: {
         "label": "CI Detected",
         "tier": "elevated",
         "description": "Chaos Insurgency activity detected on or near the site. Increase security posture and verify all credentials.",
+        "sound": "level-2-5.mp3",
     },
     4: {
         "label": "Mass SCP Breach",
         "tier": "severe",
         "description": "Multiple containment breaches in progress. Non-essential personnel proceed to designated shelter points.",
+        "sound": "level-2-5.mp3",
     },
     5: {
         "label": "Mass Dangerous SCP Breach",
         "tier": "severe",
         "description": "Multiple hazardous anomalies are loose. All personnel proceed to designated shelter points immediately.",
+        "sound": "level-2-5.mp3",
     },
     6: {
         "label": "CI Raid",
         "tier": "critical",
         "description": "Chaos Insurgency forces are engaging site security. All non-security personnel shelter in place.",
+        "sound": "level-6.mp3",
     },
     7: {
         "label": "Evacuation",
         "tier": "critical",
         "description": "Evacuate the facility immediately via the nearest marked exit. This is not a drill.",
+        "sound": "level-7.mp3",
     },
 }
 
@@ -104,6 +113,7 @@ def _site_alarm_state(site):
         "label": info["label"],
         "tier": info["tier"],
         "description": info["description"],
+        "sound": info["sound"],
         "message": (row.get("Message") if row else "") or "",
         "updated_by": (row.get("Updated By") if row else "") or "",
         "updated_at": (row.get("Updated At") if row else "") or "",
@@ -184,7 +194,6 @@ def login():
                 session["staff_name"] = staff_row.get("Name")
                 session["staff_id"] = staff_row.get("ID")
                 session["staff_role"] = (staff_row.get("Role") or "").strip()
-                session["staff_site"] = (staff_row.get("Site") or "").strip()
                 session["privileged"] = auth.is_privileged(staff_row)
                 return redirect(url_for("dashboard" if session["privileged"] else "staff_duties"))
     return render_template("login.html", error=error)
@@ -479,14 +488,8 @@ def alarms():
 
 @app.route("/site-status")
 def site_status():
-    privileged = session.get("privileged", False)
-    viewer_site = session.get("staff_site", "")
     known_sites = _known_sites()
-
-    if privileged:
-        selected_site = request.args.get("site", "").strip() or viewer_site or (known_sites[0] if known_sites else "")
-    else:
-        selected_site = viewer_site
+    selected_site = request.args.get("site", "").strip() or (known_sites[0] if known_sites else "")
 
     state = _site_alarm_state(selected_site) if selected_site else None
     announcement = _announcement_payload(_latest_announcement(selected_site)) if selected_site else None
@@ -496,17 +499,13 @@ def site_status():
         state=state,
         announcement=announcement,
         selected_site=selected_site,
-        privileged=privileged,
         known_sites=known_sites,
     )
 
 
 @app.route("/site-status/data")
 def site_status_data():
-    privileged = session.get("privileged", False)
-    viewer_site = session.get("staff_site", "")
-    requested = request.args.get("site", "").strip()
-    selected_site = requested if (privileged and requested) else viewer_site
+    selected_site = request.args.get("site", "").strip()
 
     if not selected_site:
         return jsonify({"error": "No site to report on."}), 404

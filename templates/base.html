@@ -32,10 +32,10 @@
           <a href="{{ url_for('edit_history') }}">History</a>
           <a href="{{ url_for('alarms') }}">Alarms</a>
           <a href="{{ url_for('announcements') }}">Announcements</a>
+          <a href="{{ url_for('site_status') }}">Site Status</a>
         {% endif %}
         <a href="{{ url_for('staff_duties') }}">Staff Duties</a>
         <a href="{{ url_for('role_comms') }}">Role Comms</a>
-        <a href="{{ url_for('site_status') }}">Site Status</a>
         <a href="{{ url_for('logout') }}">Log Out ({{ session['staff_name'] }})</a>
       </nav>
     {% endif %}
